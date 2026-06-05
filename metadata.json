@@ -1,0 +1,6 @@
+{
+  "name": "IDEVA Factory OS",
+  "description": "Enterprise-grade Factory Management Web Application featuring Production, Maintenance, HR & Payroll, and Accounting OS modules.",
+  "requestFramePermissions": ["camera", "microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

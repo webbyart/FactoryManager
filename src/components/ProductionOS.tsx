@@ -1,0 +1,893 @@
+import React, { useState } from 'react';
+import { 
+  Plus, Check, Play, ShieldAlert, Package, Layers, FileSpreadsheet, 
+  Settings, ShoppingCart, TrendingUp, HelpCircle, Archive, AlertTriangle, ArrowRight
+} from 'lucide-react';
+import GoogleSheetEditor from './GoogleSheetEditor';
+
+interface ProductionOSProps {
+  dbState: any;
+  onRefresh: () => void;
+  onNotify: (msg: string, type: 'info' | 'warning' | 'error') => void;
+  userRole: string;
+}
+
+export default function ProductionOS({ dbState, onRefresh, onNotify, userRole }: ProductionOSProps) {
+  const [activeSubTab, setActiveSubTab] = useState<'boms' | 'mo' | 'procure' | 'qc' | 'inventory'>('mo');
+  
+  // States for forms
+  const [newMO, setNewMO] = useState({ productId: '', formulaId: '', qtyRequested: 100 });
+  const [newPR, setNewPR] = useState({ materialId: '', quantity: 200, urgency: 'Medium' as 'Low' | 'Medium' | 'High' });
+  const [newPO, setNewPO] = useState({ prId: '', supplierId: '', materialId: '', quantity: 200 });
+  const [newGRN, setNewGRN] = useState({ poId: '', lotNumber: 'LOT' + Date.now().toString().slice(-6), expiryDate: '', quantityReceived: 200 });
+  
+  const handleCreateMO = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if(!newMO.productId || !newMO.formulaId || !newMO.qtyRequested) {
+      onNotify("Please select product, recipe formula and target quantity.", "warning");
+      return;
+    }
+    try {
+      const response = await fetch('/api/mo/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          productId: newMO.productId,
+          formulaId: newMO.formulaId,
+          quantityRequested: Number(newMO.qtyRequested)
+        })
+      });
+      const data = await response.json();
+      if (data.success) {
+        onNotify(`Successfully logged Manufacturing Order ${data.mo.id}`, "info");
+        onRefresh();
+        setNewMO({ productId: '', formulaId: '', qtyRequested: 100 });
+      } else {
+        onNotify(data.error, "error");
+      }
+    } catch {
+      onNotify("Network communication failed.", "error");
+    }
+  };
+
+  const handleUpdateMOStatus = async (moId: string, nextStatus: string) => {
+    try {
+      const response = await fetch('/api/mo/status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ moId, status: nextStatus })
+      });
+      const data = await response.json();
+      if (data.success) {
+        onNotify(`Order ${moId} transitioned successfully to: ${nextStatus}.`, "info");
+        onRefresh();
+      } else {
+        onNotify(data.error, "error");
+      }
+    } catch {
+      onNotify("Failed to advance manufacturing gate.", "error");
+    }
+  };
+
+  const handleCreatePR = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if(!newPR.materialId || !newPR.quantity) return;
+    try {
+      const res = await fetch('/api/procurement/pr/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newPR)
+      });
+      const data = await res.json();
+      if(data.success) {
+        onNotify(`Purchase Request generated successfully. ID: ${data.pr.id}`, "info");
+        onRefresh();
+        setNewPR({ materialId: '', quantity: 200, urgency: 'Medium' });
+      }
+    } catch {
+      onNotify("Communication failure.", "error");
+    }
+  };
+
+  const handleCreatePOFromPR = async (prId: string, materialId: string, quantity: number, supplierId: string) => {
+    try {
+      const res = await fetch('/api/procurement/po/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prId, supplierId, materialId, quantity })
+      });
+      const data = await res.json();
+      if(data.success) {
+        onNotify(`PR escalated to official Purchase Order ID ${data.po.id}`, "info");
+        onRefresh();
+      }
+    } catch {
+      onNotify("Failed to escalate procurement slip.", "error");
+    }
+  };
+
+  const handleReceiveGRN = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if(!newGRN.poId || !newGRN.lotNumber || !newGRN.expiryDate || !newGRN.quantityReceived) {
+      onNotify("Please supply correct PO ref, lot marker and safety expiration date.", "warning");
+      return;
+    }
+    try {
+      const res = await fetch('/api/procurement/grn/receive', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newGRN)
+      });
+      const data = await res.json();
+      if(data.success) {
+        onNotify(`Goods Receiving GRN loaded. IQC Inspection requested immediately for lot ${newGRN.lotNumber}.`, "warning");
+        onRefresh();
+        setNewGRN({ poId: '', lotNumber: 'LOT' + Date.now().toString().slice(-6), expiryDate: '', quantityReceived: 200 });
+      }
+    } catch {
+      onNotify("Error recording GRN.", "error");
+    }
+  };
+
+  const handleResolveQC = async (inspectionId: string, status: 'Passed' | 'Failed') => {
+    try {
+      const res = await fetch('/api/qc/resolve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ inspectionId, status })
+      });
+      const data = await res.json();
+      if(data.success) {
+        onNotify(`QC resolution recorded. Lot flagged as: ${status}`, status === 'Passed' ? "info" : "error");
+        onRefresh();
+      }
+    } catch {
+      onNotify("Failed to update QC ledger.", "error");
+    }
+  };
+
+  // RBAC checks
+  const canAccessBoms = ['Admin', 'Management', 'R&D', 'Production'].includes(userRole);
+  const canModifyMO = ['Admin', 'Production', 'QC', 'Warehouse'].includes(userRole);
+  const canProcure = ['Admin', 'Purchasing', 'Management'].includes(userRole);
+  const canDoQC = ['Admin', 'QC', 'Management'].includes(userRole);
+
+  const getWorkflowProgression = (status: string) => {
+    const gates = ['Created', 'Material Reserved', 'Material Issued', 'Weighing', 'In Production', 'Packaging', 'Finished Goods QC', 'Released'];
+    const idx = gates.indexOf(status);
+    if(idx === -1 || idx === gates.length - 1) return null;
+    return gates[idx + 1];
+  };
+
+  return (
+    <div className="space-y-6" id="production-os-panel">
+      {/* Module Title */}
+      <div className="bg-white p-6 rounded-2xl border border-[#E5E5EA] shadow-sm space-y-2">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 bg-[#1D1D1F] rounded-xl text-white">
+            <Layers className="h-5 w-5" />
+          </div>
+          <div>
+            <h2 className="text-base font-semibold text-[#1D1D1F] tracking-tight">ระบบจัดวางและควบคุมการผลิตเคมี (Production &amp; Manufacturing OS)</h2>
+            <p className="text-xs text-[#86868B] mt-0.5">
+              ศูนย์รวมสูตรผสมเคมีภัณฑ์ (BOM Formula), สั่งพิมพ์ใบจ่ายและตักเคมี (MO), กำหนดความเสี่ยงภัยคลังสินค้า และสถิติของเหลือแบบ FEFO ทันที
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Sub menu controls */}
+      <div className="flex bg-[#E8E8ED] p-1 rounded-xl border border-[#D1D1D6] overflow-x-auto gap-0.5 select-none">
+        <button
+          type="button"
+          onClick={() => setActiveSubTab('mo')}
+          className={`flex-1 py-1.5 px-3 rounded-lg font-medium text-xs transition-all whitespace-nowrap ${activeSubTab === 'mo' ? 'bg-white text-[#1D1D1F] shadow-sm font-semibold' : 'text-[#86868B] hover:text-[#1D1D1F]'}`}
+        >
+          รายการสั่งผลิตสินค้า (MO)
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveSubTab('boms')}
+          className={`flex-1 py-1.5 px-3 rounded-lg font-medium text-xs transition-all whitespace-nowrap ${activeSubTab === 'boms' ? 'bg-white text-[#1D1D1F] shadow-sm font-semibold' : 'text-[#86868B] hover:text-[#1D1D1F]'}`}
+        >
+          สูตรผสมเคมีภัณฑ์ (BOM Formula)
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveSubTab('procure')}
+          className={`flex-1 py-1.5 px-3 rounded-lg font-medium text-xs transition-all whitespace-nowrap ${activeSubTab === 'procure' ? 'bg-white text-[#1D1D1F] shadow-sm font-semibold' : 'text-[#86868B] hover:text-[#1D1D1F]'}`}
+        >
+          งานจัดซื้อวัตถุดิบ (Procurement)
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveSubTab('qc')}
+          className={`flex-1 py-1.5 px-3 rounded-lg font-medium text-xs transition-all whitespace-nowrap ${activeSubTab === 'qc' ? 'bg-white text-[#1D1D1F] shadow-sm font-semibold' : 'text-[#86868B] hover:text-[#1D1D1F]'}`}
+        >
+          งานตรวจสอบคุณภาพ (QC Inspector)
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveSubTab('inventory')}
+          className={`flex-1 py-1.5 px-3 rounded-lg font-medium text-xs transition-all whitespace-nowrap ${activeSubTab === 'inventory' ? 'bg-white text-[#1D1D1F] shadow-sm font-semibold' : 'text-[#86868B] hover:text-[#1D1D1F]'}`}
+        >
+          คลังคุมสต็อกสินค้า (Stocks FEFO)
+        </button>
+      </div>
+
+      {/* Main Section viewports */}
+      <div className="min-h-[400px]">
+
+        {/* 1. MO & DISPATCH SCREEN */}
+        {activeSubTab === 'mo' && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Quick Dispatch MO */}
+            <div className="lg:col-span-1 bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm h-fit space-y-4">
+              <h3 className="font-semibold text-slate-800 text-base flex items-center gap-2">
+                <Plus className="h-5 w-5 text-blue-600" /> Dispatch New Manufacturing Order
+              </h3>
+              <p className="text-slate-500 text-xs">
+                Log a production dispatch. This locks the chosen recipe and launches automated material requisitions calculations.
+              </p>
+              
+              {!canModifyMO ? (
+                <div className="bg-amber-50 text-amber-800 p-3 rounded-xl text-xs border border-amber-100">
+                  Role [<strong>{userRole}</strong>] limited to Read-Only access. Only Admin or Production roles can dispatch manufacturing.
+                </div>
+              ) : (
+                <form onSubmit={handleCreateMO} className="space-y-4">
+                  <div className="space-y-1">
+                    <label className="text-xs text-slate-500 font-medium">Select Finished Product SKU</label>
+                    <select
+                      className="w-full text-sm rounded-xl border border-slate-300 p-2.5 bg-slate-50"
+                      value={newMO.productId}
+                      onChange={(e) => {
+                        const pid = e.target.value;
+                        const fm = dbState.formulas.find((f: any) => f.productId === pid);
+                        setNewMO({ ...newMO, productId: pid, formulaId: fm ? fm.id : '' });
+                      }}
+                      required
+                    >
+                      <option value="">-- Choose SKU --</option>
+                      {dbState.products.map((p: any) => (
+                        <option key={p.id} value={p.id}>{p.sku} | {p.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs text-slate-500 font-medium">Auto BOM Recipe Formula</label>
+                    <select
+                      className="w-full text-sm rounded-xl border border-slate-300 p-2.5 bg-slate-100"
+                      value={newMO.formulaId}
+                      readOnly
+                      required
+                    >
+                      <option value="">-- Autopairing via product --</option>
+                      {dbState.formulas.map((f: any) => (
+                        <option key={f.id} value={f.id}>BOM Ref {f.id} (v{f.version})</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs text-slate-500 font-medium">Dispatch Qty (Target Units)</label>
+                    <input
+                      type="number"
+                      className="w-full text-sm rounded-xl border border-slate-300 p-2.5 bg-slate-50"
+                      value={newMO.qtyRequested}
+                      onChange={(e) => setNewMO({ ...newMO, qtyRequested: Number(e.target.value) })}
+                      min={10}
+                      required
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium text-sm rounded-xl shadow-md transition-colors flex items-center justify-center gap-2"
+                  >
+                    Generate Material Requirements
+                  </button>
+                </form>
+              )}
+            </div>
+
+            {/* Active MO Grid Kanban */}
+            <div className="lg:col-span-2 space-y-4">
+              <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                <h3 className="font-semibold text-slate-800 text-sm">Active Floor Operations Ledger</h3>
+                <span className="text-xs bg-slate-100 px-3 py-1 rounded-full text-slate-700 font-medium">{dbState.manufacturingOrders.length} manufacturing orders</span>
+              </div>
+
+              <div className="space-y-4">
+                {dbState.manufacturingOrders.map((mo: any) => {
+                  const product = dbState.products.find((p: any) => p.id === mo.productId);
+                  const nextStatus = getWorkflowProgression(mo.status);
+
+                  return (
+                    <div key={mo.id} className="bg-white p-5 rounded-2xl border border-slate-200 hover:border-blue-200 transition-colors shadow-sm space-y-4">
+                      {/* Header bar */}
+                      <div className="flex justify-between items-start">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2.5">
+                            <span className="font-bold font-mono text-base text-slate-800">{mo.id}</span>
+                            <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${
+                              mo.status === 'Released' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
+                              mo.status.includes('QC') ? 'bg-indigo-50 text-indigo-700 border border-indigo-100' :
+                              mo.status === 'In Production' ? 'bg-amber-50 text-amber-700 border border-blue-100 animate-pulse' :
+                              'bg-slate-100 text-slate-600'
+                            }`}>
+                              {mo.status}
+                            </span>
+                          </div>
+                          <p className="text-sm font-semibold text-slate-700 capitalize">{product ? product.name : 'Unknown Product'}</p>
+                          <p className="text-xs text-slate-400 font-mono">BOM Formula Lock: {mo.formulaId} | Commenced: {mo.startDate}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs text-slate-500 font-medium">Dispatched Volume</p>
+                          <p className="text-lg font-bold text-slate-800 font-mono">{mo.quantityRequested} Units</p>
+                        </div>
+                      </div>
+
+                      {/* Timeline flow simulation */}
+                      <div className="bg-slate-50 p-3 rounded-lg flex items-center justify-between text-[10px] text-slate-500 font-mono gap-1 select-none overflow-x-auto">
+                        <span className={mo.status !== 'Created' ? 'text-blue-700 font-bold' : 'text-blue-500 underline'}>Created</span>
+                        <ArrowRight className="h-3 w-3" />
+                        <span className={['Material Reserved', 'Material Issued', 'Weighing', 'In Production', 'Packaging', 'Finished Goods QC', 'Released'].includes(mo.status) ? 'text-blue-700 font-bold' : ''}>Reserved</span>
+                        <ArrowRight className="h-3 w-3" />
+                        <span className={['Material Issued', 'Weighing', 'In Production', 'Packaging', 'Finished Goods QC', 'Released'].includes(mo.status) ? 'text-blue-700 font-bold' : ''}>Issued</span>
+                        <ArrowRight className="h-3 w-3" />
+                        <span className={['Weighing', 'In Production', 'Packaging', 'Finished Goods QC', 'Released'].includes(mo.status) ? 'text-blue-700 font-bold' : ''}>Weigh</span>
+                        <ArrowRight className="h-3 w-3" />
+                        <span className={['In Production', 'Packaging', 'Finished Goods QC', 'Released'].includes(mo.status) ? 'text-blue-700 font-bold' : ''}>PRD</span>
+                        <ArrowRight className="h-3 w-3" />
+                        <span className={['Packaging', 'Finished Goods QC', 'Released'].includes(mo.status) ? 'text-blue-700 font-bold' : ''}>PKG</span>
+                        <ArrowRight className="h-3 w-3" />
+                        <span className={['Finished Goods QC', 'Released'].includes(mo.status) ? 'text-blue-700 font-bold' : ''}>FQC</span>
+                        <ArrowRight className="h-3 w-3" />
+                        <span className={mo.status === 'Released' ? 'text-emerald-700 font-extrabold' : ''}>Released</span>
+                      </div>
+
+                      {/* Cost metrics if resolved */}
+                      {mo.costSummary && (
+                        <div className="p-3 bg-indigo-50/50 rounded-xl grid grid-cols-2 md:grid-cols-5 text-center text-xs gap-2 border border-indigo-100/40">
+                          <div>
+                            <p className="text-slate-500">Material Cost</p>
+                            <p className="font-semibold text-slate-800">${mo.costSummary.materialCost.toLocaleString()}</p>
+                          </div>
+                          <div>
+                            <p className="text-slate-500">Packaging</p>
+                            <p className="font-semibold text-slate-800">${mo.costSummary.packagingCost.toLocaleString()}</p>
+                          </div>
+                          <div>
+                            <p className="text-slate-500">Labor/Hrs</p>
+                            <p className="font-semibold text-slate-800">${mo.costSummary.laborCost.toLocaleString()}</p>
+                          </div>
+                          <div>
+                            <p className="text-slate-500">Facility Overhead</p>
+                            <p className="font-semibold text-slate-800">${mo.costSummary.overheadCost.toLocaleString()}</p>
+                          </div>
+                          <div className="bg-emerald-50 px-2 py-1 rounded">
+                            <p className="text-emerald-700 font-medium">Cost / Unit</p>
+                            <p className="font-bold text-emerald-800">${mo.costSummary.costPerPiece}</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Fast Action Buttons */}
+                      {canModifyMO && nextStatus && (
+                        <div className="flex gap-2 justify-end">
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateMOStatus(mo.id, nextStatus)}
+                            className="bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-100 py-1.5 px-4 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                          >
+                            <Play className="h-4 w-4" />
+                            Advance gate: {nextStatus}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 2. BOM RECIPE MANAGER */}
+        {activeSubTab === 'boms' && (
+          <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm space-y-6">
+            <h3 className="font-semibold text-slate-800 text-lg flex items-center gap-2">
+              <Layers className="h-5 w-5 text-indigo-600" /> R&D Formula & Packaging Bill of Materials (BOM)
+            </h3>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {dbState.formulas.map((form: any) => {
+                const associatedProduct = dbState.products.find((p: any) => p.id === form.productId);
+                
+                return (
+                  <div key={form.id} className="border border-slate-200 rounded-xl overflow-hidden shadow-xs hover:border-slate-300 transition-colors">
+                    <div className="bg-slate-50 px-4 py-3 border-b border-slate-200 flex justify-between items-center">
+                      <div>
+                        <span className="font-bold text-slate-800 font-mono text-sm">{form.id}</span>
+                        <p className="text-xs text-slate-500 font-semibold">{associatedProduct ? associatedProduct.name : 'Finished Piece SKU'}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs bg-indigo-50 text-indigo-700 font-semibold px-2 py-0.5 rounded border border-indigo-100">Version {form.version}</span>
+                        <span className="text-xs bg-emerald-50 text-emerald-700 font-semibold px-2 py-0.5 rounded border border-emerald-100">{form.status}</span>
+                      </div>
+                    </div>
+
+                    <div className="p-4 space-y-3">
+                      <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Itemized Ingredients (Per unit multiplier)</p>
+                      <table className="w-full text-xs text-left text-slate-600">
+                        <thead>
+                          <tr className="border-b border-slate-100 text-slate-400 font-mono">
+                            <th className="pb-1.5">Material</th>
+                            <th className="pb-1.5 text-right">Raw Qty req.</th>
+                            <th className="pb-1.5 text-right">Standard Cost</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {form.items.map((item: any) => {
+                            const mat = dbState.materials.find((m: any) => m.id === item.materialId);
+                            return (
+                              <tr key={item.materialId} className="border-b border-slate-100/50">
+                                <td className="py-2">
+                                  <p className="font-medium text-slate-800">{mat ? mat.name : 'Chemical compound'}</p>
+                                  <p className="text-[10px] text-slate-400 font-mono">{mat ? mat.code : 'RAW-MAT'}</p>
+                                </td>
+                                <td className="py-2 text-right font-mono text-slate-800">{item.quantity} {mat?.unit}</td>
+                                <td className="py-2 text-right font-mono text-slate-400">
+                                  ${mat ? (item.quantity * mat.costPerUnit).toFixed(2) : '0.00'}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                      <div className="text-right pt-2 border-t border-slate-100 text-[10px] text-slate-400">
+                        Formula lock approved by: <strong className="text-slate-700">{form.approvedBy || 'Senior Chemist'}</strong>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* 3. PROCUREMENT DESK */}
+        {activeSubTab === 'procure' && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-1 space-y-6">
+              {/* Manual PR Trigger */}
+              <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm space-y-3">
+                <h4 className="font-semibold text-slate-800 text-sm">Issue Manual Purchase Request</h4>
+                <p className="text-xs text-slate-500">Esclalate supplier ordering slips for raw material replenishments.</p>
+                <form onSubmit={handleCreatePR} className="space-y-3">
+                  <div className="space-y-1">
+                    <label className="text-[11px] text-slate-500 font-medium">Select Target Raw Material</label>
+                    <select
+                      className="w-full text-xs rounded-xl border border-slate-300 p-2 bg-slate-50"
+                      value={newPR.materialId}
+                      onChange={(e) => setNewPR({ ...newPR, materialId: e.target.value })}
+                      required
+                    >
+                      <option value="">-- Select Material --</option>
+                      {dbState.materials.map((m: any) => (
+                        <option key={m.id} value={m.id}>{m.code} | {m.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[11px] text-slate-500 font-medium">Replenish Target Qty</label>
+                    <input
+                      type="number"
+                      className="w-full text-xs rounded-xl border border-slate-300 p-2 bg-slate-50"
+                      value={newPR.quantity}
+                      onChange={(e) => setNewPR({ ...newPR, quantity: Number(e.target.value) })}
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[11px] text-slate-500 font-medium">Urgence Tier</label>
+                    <select
+                      className="w-full text-xs rounded-xl border border-slate-300 p-2 bg-slate-50"
+                      value={newPR.urgency}
+                      onChange={(e) => setNewPR({ ...newPR, urgency: e.target.value as any })}
+                    >
+                      <option value="Low">Low Priority</option>
+                      <option value="Medium">Medium Priority</option>
+                      <option value="High">High Urgency</option>
+                    </select>
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="w-full bg-blue-600 text-white rounded-xl py-2 font-semibold text-xs transition-colors"
+                  >
+                    Draft Procurement Intent
+                  </button>
+                </form>
+              </div>
+
+              {/* GRN receiving dock */}
+              <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm space-y-3">
+                <h4 className="font-semibold text-slate-800 text-sm">Goods Receiving Note (GRN) Desk</h4>
+                <p className="text-xs text-slate-500">Record incoming trucks from chemical refiners. Triggers automatic IQC.</p>
+                <form onSubmit={handleReceiveGRN} className="space-y-3">
+                  <div className="space-y-1">
+                    <label className="text-[11px] text-slate-500 font-medium">Purchase Order Reference Match</label>
+                    <select
+                      className="w-full text-xs rounded-xl border border-slate-300 p-2 bg-slate-50"
+                      value={newGRN.poId}
+                      onChange={(e) => setNewGRN({ ...newGRN, poId: e.target.value })}
+                      required
+                    >
+                      <option value="">-- Choose active PO --</option>
+                      {dbState.purchaseOrders.filter((po: any)=> po.status === 'Issued').map((po: any) => (
+                        <option key={po.id} value={po.id}>{po.id} | Qty {po.quantity} (Supplier: {po.supplierId})</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[11px] text-slate-500 font-medium">Manufacture Lot Number</label>
+                    <input
+                      type="text"
+                      className="w-full text-xs rounded-xl border border-slate-300 p-2 bg-slate-50 font-mono"
+                      value={newGRN.lotNumber}
+                      onChange={(e) => setNewGRN({ ...newGRN, lotNumber: e.target.value })}
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[11px] text-slate-500 font-medium">BOM Retain Expiry Date</label>
+                    <input
+                      type="date"
+                      className="w-full text-xs rounded-xl border border-slate-300 p-2 bg-slate-50"
+                      value={newGRN.expiryDate}
+                      onChange={(e) => setNewGRN({ ...newGRN, expiryDate: e.target.value })}
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[11px] text-slate-500 font-medium">Actual Quantity Unloaded</label>
+                    <input
+                      type="number"
+                      className="w-full text-xs rounded-xl border border-slate-300 p-2 bg-slate-50"
+                      value={newGRN.quantityReceived}
+                      onChange={(e) => setNewGRN({ ...newGRN, quantityReceived: Number(e.target.value) })}
+                      required
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="w-full bg-slate-900 text-white rounded-xl py-2 font-semibold text-xs hover:bg-slate-850"
+                  >
+                    Generate GRN & Request IQC
+                  </button>
+                </form>
+              </div>
+            </div>
+
+            {/* active PR/PO/GRN pipeline list */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* Purchase Requests */}
+              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+                <h3 className="font-semibold text-slate-800 text-sm">Purchase Requests Pipeline</h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs text-slate-600">
+                    <thead>
+                      <tr className="border-b border-slate-100 font-mono text-slate-400 text-left">
+                        <th className="pb-2">PR Ref</th>
+                        <th className="pb-2">Material</th>
+                        <th className="pb-2 text-right">Volume</th>
+                        <th className="pb-2 text-center">Urgency</th>
+                        <th className="pb-2">Status</th>
+                        <th className="pb-2 text-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {dbState.purchaseRequests.map((pr: any) => {
+                        const mat = dbState.materials.find((m: any) => m.id === pr.materialId);
+                        
+                        return (
+                          <tr key={pr.id} className="border-b border-slate-100">
+                            <td className="py-2.5 font-bold font-mono text-slate-800">{pr.id}</td>
+                            <td className="py-2.5">{mat ? mat.name : pr.materialId}</td>
+                            <td className="py-2.5 text-right font-mono">{pr.quantity} {mat?.unit}</td>
+                            <td className="py-2.5 text-center">
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                pr.urgency === 'High' ? 'bg-rose-50 text-rose-600' : 'bg-slate-100 text-slate-600'
+                              }`}>{pr.urgency}</span>
+                            </td>
+                            <td className="py-2.5 font-semibold text-slate-500">{pr.status}</td>
+                            <td className="py-2.5 text-right">
+                              {pr.status === 'Draft' && canProcure && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleCreatePOFromPR(pr.id, pr.materialId, pr.quantity, 'supp-1')}
+                                  className="bg-blue-600 text-white rounded px-2.5 py-1 text-[10px] font-semibold"
+                                >
+                                  Raise PO
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Purchase Orders Issued */}
+              <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+                <h3 className="font-semibold text-slate-800 text-sm">Active Purchase Orders Ledger</h3>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs text-slate-600">
+                    <thead>
+                      <tr className="border-b border-slate-100 font-mono text-slate-400 text-left">
+                        <th className="pb-2">PO Ref</th>
+                        <th className="pb-2">Supplier</th>
+                        <th className="pb-2 text-right">PR Ref</th>
+                        <th className="pb-2 text-right font-mono">Liability Val</th>
+                        <th className="pb-2 text-right">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {dbState.purchaseOrders.map((po: any) => (
+                        <tr key={po.id} className="border-b border-slate-100">
+                          <td className="py-2.5 font-bold font-mono text-slate-800">{po.id}</td>
+                          <td className="py-2.5 font-semibold">{po.supplierId}</td>
+                          <td className="py-2.5 text-right font-mono text-slate-400">{po.prId || 'Direct'}</td>
+                          <td className="py-2.5 text-right font-semibold text-slate-700">${po.totalCost.toLocaleString()}</td>
+                          <td className="py-2.5 text-right">
+                            <span className="bg-amber-50 text-amber-700 px-2 py-0.5 rounded text-[10px] font-semibold">{po.status}</span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 4. QUALITY CONTROL HUB (IQC & NCR) */}
+        {activeSubTab === 'qc' && (
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-4">
+              <div>
+                <h3 className="font-semibold text-slate-800 text-lg flex items-center gap-2">
+                  <ShieldAlert className="h-5 w-5 text-red-600" /> Executive QC Inspection Desk
+                </h3>
+                <p className="text-slate-500 text-xs mt-1">Accepting or Rejecting chemical lots. Automated quarantine locks triggering Non-Conformance Reports (NCR) upon failure.</p>
+              </div>
+              <span className="text-xs bg-slate-100 text-slate-600 font-bold px-3 py-1 rounded-full">{dbState.qcInspections.length} Total inspections in queue</span>
+            </div>
+
+            <div className="space-y-4">
+              {dbState.qcInspections.map((qc: any) => (
+                <div key={qc.id} className="border border-slate-200 rounded-xl p-5 space-y-4">
+                  <div className="flex justify-between items-start">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold font-mono text-sm text-slate-800">{qc.id}</span>
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                          qc.sourceType === 'Incoming' ? 'bg-amber-50 text-amber-600 border border-amber-100' : 'bg-blue-50 text-blue-600 border border-blue-100'
+                        }`}>{qc.sourceType} inspection</span>
+                      </div>
+                      <p className="text-xs text-slate-500 font-mono">Lot Tracking Marker / Reference: <strong className="text-slate-700">{qc.referenceId}</strong> | Scheduled: {qc.createdAt}</p>
+                    </div>
+
+                    <div>
+                      <span className={`px-2.5 py-1 text-xs rounded-full font-bold uppercase ${
+                        qc.status === 'Passed' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
+                        qc.status === 'Failed' ? 'bg-rose-50 text-rose-700 border border-rose-200 animate-bounce' :
+                        'bg-amber-100 text-amber-700 animate-pulse'
+                      }`}>
+                        {qc.status}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Checklist and technical parameters */}
+                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                    <h4 className="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-2">Detailed Parameter Verification Log</h4>
+                    <div className="space-y-2 text-xs">
+                      {qc.parameters.map((p: any, i: number) => (
+                        <div key={i} className="flex justify-between items-center text-slate-700 border-b border-dashed border-slate-200/60 pb-1.5 last:border-0 last:pb-0">
+                          <div>
+                            <span className="font-medium">{p.name}</span>
+                            <p className="text-[10px] text-slate-400 font-mono">Specification limit limit expected: {p.expected}</p>
+                          </div>
+                          <div className="text-right">
+                            <span className="font-mono text-slate-800 font-semibold">{p.value}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Resolve parameters controls */}
+                  {qc.status === 'Pending' && (
+                    <div className="flex justify-between items-center pt-2">
+                      <span className="text-[11px] text-slate-400">Assigned inspector: <strong className="text-slate-600">{qc.inspector}</strong></span>
+                      {canDoQC ? (
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleResolveQC(qc.id, 'Failed')}
+                            className="bg-rose-50 border border-rose-100 text-rose-600 hover:bg-rose-100 py-1.5 px-4 rounded-xl text-xs font-semibold"
+                          >
+                            Reject & Quarantine (NCR)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleResolveQC(qc.id, 'Passed')}
+                            className="bg-emerald-50 border border-emerald-100 text-emerald-600 hover:bg-emerald-100 py-1.5 px-4 rounded-xl text-xs font-semibold flex items-center gap-1.5"
+                          >
+                            <Check className="h-4 w-4" />
+                            Pass & Certified Release
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="text-[10px] bg-amber-50 text-amber-800 border border-amber-100 p-2 rounded-xl">Write-Access Limited to QC personnel</span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* 5. FIFO FEFO WAREHOUSE STOCKS */}
+        {activeSubTab === 'inventory' && (
+          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6">
+            <div className="flex justify-between items-center">
+              <div>
+                <h3 className="font-semibold text-slate-800 text-lg flex items-center gap-2">
+                  <Package className="h-5 w-5 text-indigo-600" /> Active Raw Materials & Packaging Stocks (FIFO)
+                </h3>
+                <p className="text-xs text-slate-500">Continuous tracking against safety thresholds. Automated purchase requests triggered below safety levels.</p>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs text-slate-600 text-left">
+                <thead>
+                  <tr className="border-b border-slate-200 bg-slate-50 text-slate-400 font-mono uppercase text-[10px]">
+                    <th className="py-3 px-4">Material Code</th>
+                    <th className="py-3 px-4">Brand / Segment name</th>
+                    <th className="py-3 px-4">Classification</th>
+                    <th className="py-3 px-4 text-right">Safety Safety min</th>
+                    <th className="py-3 px-4 text-right">Unrestricted Stock</th>
+                    <th className="py-3 px-4 text-center">Unit</th>
+                    <th className="py-3 px-4 text-right">Standard Cost/U</th>
+                    <th className="py-3 px-4 text-right">% Safety margin</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {dbState.materials.map((m: any) => {
+                    const pctSafety = m.stockLevel >= m.minStock ? 'Unrestricted' : 'Sub-Optimal warning';
+                    
+                    return (
+                      <tr key={m.id} className={`border-b border-slate-100 hover:bg-slate-50 transition-colors ${
+                        m.stockLevel < m.minStock ? 'bg-rose-50/20' : ''
+                      }`}>
+                        <td className="py-3.5 px-4 font-bold font-mono text-slate-800">{m.code}</td>
+                        <td className="py-3.5 px-4 font-semibold text-slate-700">{m.name}</td>
+                        <td className="py-3.5 px-4">{m.category}</td>
+                        <td className="py-3.5 px-4 text-right font-mono text-slate-500">{m.minStock}</td>
+                        <td className="py-3.5 px-4 text-right font-bold font-mono text-slate-800">{m.stockLevel}</td>
+                        <td className="py-3.5 px-4 text-center text-slate-500 font-medium">{m.unit}</td>
+                        <td className="py-3.5 px-4 text-right font-mono">${m.costPerUnit.toFixed(2)}</td>
+                        <td className="py-3.5 px-4 text-right">
+                          <span className={`px-2.5 py-0.5 rounded text-[10px] font-bold ${
+                            m.stockLevel >= m.minStock ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'
+                          }`}>{pctSafety}</span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+      </div>
+
+      {/* Google Sheet Simulator component bottom of page */}
+      {(() => {
+        const getSheetConfig = () => {
+          switch (activeSubTab) {
+            case 'mo':
+              return {
+                tableKey: 'manufacturingOrders',
+                tableName: 'ใบสั่งผลิตผลิตภัณฑ์ (Manufacturing Orders)',
+                columns: [
+                  { key: 'id', label: 'รหัสสั่งผลิต (MO ID)', type: 'text', readOnly: true },
+                  { key: 'productId', label: 'รหัสผลิตภัณฑ์', type: 'text' },
+                  { key: 'formulaId', label: 'รหัสสูตรผลิต', type: 'text' },
+                  { key: 'quantityRequested', label: 'จำนวนสั่งผลิต', type: 'number' },
+                  { key: 'quantityProduced', label: 'จำนวนที่ผลิตแล้ว', type: 'number' },
+                  { key: 'status', label: 'สถานะขั้นตอน', type: 'select', options: ['Created', 'Material Reserved', 'Material Issued', 'Weighing', 'In Production', 'Packaging', 'Finished Goods QC', 'Released'] }
+                ] as any,
+                data: dbState.manufacturingOrders || []
+              };
+            case 'inventory':
+              return {
+                tableKey: 'materials',
+                tableName: 'คลังวัตถุดิบและวัสดุอุปกรณ์ (Materials)',
+                columns: [
+                  { key: 'id', label: 'รหัสวัตถุดิบ (ID)', type: 'text', readOnly: true },
+                  { key: 'code', label: 'รหัสโค้ด', type: 'text' },
+                  { key: 'name', label: 'ชื่อวัตถุดิบ / วัสดุชิ้นส่วน', type: 'text' },
+                  { key: 'category', label: 'หมวดหมู่สินค้า', type: 'text' },
+                  { key: 'stockLevel', label: 'คลังสะสมคงเหลือ', type: 'number' },
+                  { key: 'minStock', label: 'ระดับเกณฑ์ขั้นต่ำ', type: 'number' },
+                  { key: 'unit', label: 'หน่วยวัด', type: 'text' },
+                  { key: 'costPerUnit', label: 'ต้นทุนต่อหน่วย ($)', type: 'number' }
+                ] as any,
+                data: dbState.materials || []
+              };
+            case 'procure':
+              return {
+                tableKey: 'purchaseRequests',
+                tableName: 'แบบคำขอซื้อวัตถุดิบจัดซื้อ (Purchase Requests)',
+                columns: [
+                  { key: 'id', label: 'รหัสขอซื้อ(PR ID)', type: 'text', readOnly: true },
+                  { key: 'materialId', label: 'รหัสวัตถุดิบ', type: 'text' },
+                  { key: 'quantity', label: 'จำนวนสั่งซื้อ', type: 'number' },
+                  { key: 'urgency', label: 'ระดับความเร็ว', type: 'select', options: ['Low', 'Medium', 'High'] },
+                  { key: 'status', label: 'สถานะของเอกสาร', type: 'select', options: ['Draft', 'Approved', 'PO Issued', 'Rejected'] },
+                  { key: 'requestedBy', label: 'เจ้าหน้าที่ขอซื้อ', type: 'text' }
+                ] as any,
+                data: dbState.purchaseRequests || []
+              };
+            case 'qc':
+              return {
+                tableKey: 'qcInspections',
+                tableName: 'การส่งตรวจควบคุมคุณภาพสินค้า (QC Inspections)',
+                columns: [
+                  { key: 'id', label: 'รหัสบันทึก QC', type: 'text', readOnly: true },
+                  { key: 'lotNumber', label: 'ล็อตสลากกำกับสินค้า', type: 'text' },
+                  { key: 'inspector', label: 'ผู้ตรวจสอบและเซ็นรับ', type: 'text' },
+                  { key: 'status', label: 'ผลสรุปคุณภาพ', type: 'select', options: ['Pending', 'Passed', 'Failed'] },
+                  { key: 'notes', label: 'บันทึกความปลอดภัยเพิ่ม', type: 'text' }
+                ] as any,
+                data: dbState.qcInspections || []
+              };
+            default:
+              return null;
+          }
+        };
+
+        const config = getSheetConfig();
+        if (!config) return null;
+        
+        return (
+          <GoogleSheetEditor
+            tableKey={config.tableKey}
+            tableName={config.tableName}
+            columns={config.columns}
+            data={config.data}
+            onRefresh={onRefresh}
+            onNotify={onNotify}
+          />
+        );
+      })()}
+    </div>
+  );
+}
