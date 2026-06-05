@@ -15,6 +15,7 @@ import MaintenanceOS from './components/MaintenanceOS';
 import HRPayrollOS from './components/HRPayrollOS';
 import AccountingOS from './components/AccountingOS';
 import DeveloperOS from './components/DeveloperOS';
+import DashboardQuickTable from './components/DashboardQuickTable';
 
 export default function App() {
   const [dbState, setDbState] = useState<any>(null);
@@ -385,7 +386,7 @@ export default function App() {
                 <div className="bg-white p-6 rounded-2xl border border-[#E5E5EA] shadow-sm flex items-center justify-between transition-shadow hover:shadow-md">
                   <div className="space-y-1">
                     <p className="text-[#86868B] text-[11px] font-semibold uppercase tracking-wider">รายรับสุทธิ (Net Earnings)</p>
-                    <p className="text-2xl font-bold tracking-tight text-[#34C759] font-mono">${netEarnings.toLocaleString()}</p>
+                    <p className="text-2xl font-bold tracking-tight text-[#34C759] font-mono">฿{netEarnings.toLocaleString()}</p>
                     <span className="text-[10px] text-slate-400 font-medium">รวมบันทึกสุทธิถ้วน</span>
                   </div>
                   <span className="p-3 bg-neutral-50 border border-[#E5E5EA] text-[#34C759] rounded-xl"><DollarSign className="h-5 w-5" /></span>
@@ -404,7 +405,7 @@ export default function App() {
                     </div>
                   </div>
                   <div className="h-64">
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                       <AreaChart data={revenueExpenseChartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                         <defs>
                           <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
@@ -420,8 +421,8 @@ export default function App() {
                         <YAxis stroke="#86868B" fontSize={10} />
                         <Tooltip />
                         <Legend />
-                        <Area type="monotone" dataKey="GrossRevenues" stroke="#0071E3" fillOpacity={1} fill="url(#colorRev)" name="รายรับรวม (Revenues) ($)" />
-                        <Area type="monotone" dataKey="TotalOpex" stroke="#FF3B30" fillOpacity={1} fill="url(#colorOpex)" name="รายจ่ายสะสม (Gross Opex) ($)" />
+                        <Area type="monotone" dataKey="GrossRevenues" stroke="#0071E3" fillOpacity={1} fill="url(#colorRev)" name="รายรับรวม (Revenues) (฿)" />
+                        <Area type="monotone" dataKey="TotalOpex" stroke="#FF3B30" fillOpacity={1} fill="url(#colorOpex)" name="รายจ่ายสะสม (Gross Opex) (฿)" />
                       </AreaChart>
                     </ResponsiveContainer>
                   </div>
@@ -431,7 +432,7 @@ export default function App() {
                 <div className="bg-white p-6 rounded-2xl border border-[#E5E5EA] shadow-sm space-y-4 lg:col-span-1">
                   <h4 className="font-semibold text-[#1D1D1F] text-sm">การกระจายตัวขั้นตอนสั่งผลิต (Manufacturing Dispatch Stages)</h4>
                   <div className="h-60 flex items-center justify-center relative">
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                       <PieChart>
                         <Pie
                           data={moStageChartData}
@@ -540,6 +541,13 @@ export default function App() {
                 </div>
 
               </div>
+
+              {/* ตารางแสดงข้อมูล (List Table) ที่รวมปุ่มคำสั่ง แก้ไข, บันทึก, ลบ โดยใช้ Lucide icons */}
+              <DashboardQuickTable 
+                dbState={dbState}
+                onRefresh={fetchState}
+                onNotify={addToast}
+              />
             </div>
           )}
 

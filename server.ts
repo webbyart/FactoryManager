@@ -63,6 +63,26 @@ let dbState = {
     { code: '5020', name: 'Machinery Overhaul & Corrective PM OPEX', type: 'Expense', balance: 14200, id: 'coa-5020' },
     { code: '5030', name: 'Direct Raw Material Procurement OPEX', type: 'Expense', balance: 60500, id: 'coa-5030' }
   ],
+  journals: [
+    {
+      id: 'jn-001',
+      memo: 'Raw material inventory asset adjustment',
+      date: '2026-05-01',
+      lines: [
+        { accountCode: '1020', type: 'Debit', amount: 185000 },
+        { accountCode: '3010', type: 'Credit', amount: 185000 }
+      ]
+    },
+    {
+      id: 'jn-002',
+      memo: 'May 2026 plant wages ledger allocation',
+      date: '2026-05-28',
+      lines: [
+        { accountCode: '5010', type: 'Debit', amount: 150700 },
+        { accountCode: '1010', type: 'Credit', amount: 150700 }
+      ]
+    }
+  ],
   auditLogs: [...AUDIT_LOGS],
   notifications: [
     { id: 'n-1', message: 'Welcome to IDEVA Factory OS - System Boot Completed', severity: 'info', createdAt: new Date().toISOString() },
@@ -194,6 +214,26 @@ app.post("/api/state/reset", (req, res) => {
       { code: '5010', name: 'Direct Plant Wages & Labor Expenses', type: 'Expense', balance: 150700, id: 'coa-5010' },
       { code: '5020', name: 'Machinery Overhaul & Corrective PM OPEX', type: 'Expense', balance: 14200, id: 'coa-5020' },
       { code: '5030', name: 'Direct Raw Material Procurement OPEX', type: 'Expense', balance: 60500, id: 'coa-5030' }
+    ],
+    journals: [
+      {
+        id: 'jn-001',
+        memo: 'Raw material inventory asset adjustment',
+        date: '2026-05-01',
+        lines: [
+          { accountCode: '1020', type: 'Debit', amount: 185000 },
+          { accountCode: '3010', type: 'Credit', amount: 185000 }
+        ]
+      },
+      {
+        id: 'jn-002',
+        memo: 'May 2026 plant wages ledger allocation',
+        date: '2026-05-28',
+        lines: [
+          { accountCode: '5010', type: 'Debit', amount: 150700 },
+          { accountCode: '1010', type: 'Credit', amount: 150700 }
+        ]
+      }
     ],
     auditLogs: [...AUDIT_LOGS],
     notifications: [
@@ -773,6 +813,128 @@ app.post("/api/accounting/expense/add", (req, res) => {
   dbState.transactions.unshift(newTx);
   createEventLog(`Manual expense booked: ${description} - Total $${Number(amount).toLocaleString()}`, 'Accounting', 'info');
   res.json({ success: true, transaction: newTx });
+});
+
+app.post("/api/accounting/invoice/remind", (req, res) => {
+  const { invoiceId } = req.body;
+  const inv = dbState.invoices.find(i => i.id === invoiceId);
+  if (!inv) return res.status(404).json({ error: "Invoice not found" });
+  
+  createEventLog(`[AR REMINDER] Remittance notification alert dispatched to customer ledger account for invoice ${invoiceId}`, "Accounting", "info");
+  res.json({ success: true, message: `Reminder sent to client for invoice ${invoiceId}` });
+});
+
+app.post("/api/accounting/invoice/settle", (req, res) => {
+  const { invoiceId } = req.body;
+  const inv = dbState.invoices.find(i => i.id === invoiceId);
+  if (!inv) return res.status(404).json({ error: "Invoice not found" });
+  
+  inv.status = 'Paid';
+  
+  // Settle invoice logic
+  const cashAc = dbState.coa.find(c => c.code === '1010');
+  const arAc = dbState.coa.find(c => c.code === '1030');
+  if (cashAc) cashAc.balance += inv.amount;
+  if (arAc) arAc.balance = Math.max(0, arAc.balance - inv.amount);
+  
+  const journalId = `jn-settle-${Date.now().toString().slice(-4)}`;
+  dbState.journals.unshift({
+    id: journalId,
+    memo: `Settle invoice ${invoiceId} and recognize cash receipt`,
+    date: new Date().toISOString().split('T')[0],
+    lines: [
+      { accountCode: '1010', type: 'Debit', amount: inv.amount },
+      { accountCode: '1030', type: 'Credit', amount: inv.amount }
+    ]
+  });
+
+  createEventLog(`[AR REVENUE SETTLEMENT] Invoice ${invoiceId} marked as settled ($${inv.amount.toLocaleString()} cash credited). Created Journal Entry ${journalId}`, "Accounting", "info");
+  res.json({ success: true, journalId });
+});
+
+app.post("/api/accounting/bill/pay", (req, res) => {
+  const { billId } = req.body;
+  const bill = dbState.supplierBills.find(b => b.id === billId);
+  if (!bill) return res.status(404).json({ error: "Bill not found" });
+
+  bill.status = 'Paid';
+  
+  const altBill = dbState.bills.find((b: any) => b.id === billId);
+  if (altBill) altBill.status = 'Paid';
+
+  const cashAc = dbState.coa.find(c => c.code === '1010');
+  const apAc = dbState.coa.find(c => c.code === '2010');
+  if (cashAc) cashAc.balance = Math.max(0, cashAc.balance - bill.amount);
+  if (apAc) apAc.balance = Math.max(0, apAc.balance - bill.amount);
+
+  const journalId = `jn-pay-${Date.now().toString().slice(-4)}`;
+  dbState.journals.unshift({
+    id: journalId,
+    memo: `Disburse payment to settle supplier bill ${billId}`,
+    date: new Date().toISOString().split('T')[0],
+    lines: [
+      { accountCode: '2010', type: 'Debit', amount: bill.amount },
+      { accountCode: '1010', type: 'Credit', amount: bill.amount }
+    ]
+  });
+
+  createEventLog(`[AP LIABILTY DISBURSEMENT] Supplier Bill ${billId} paid & settled ($${bill.amount.toLocaleString()} cash disbursed). Created Journal Entry ${journalId}`, "Accounting", "warning");
+  res.json({ success: true, journalId });
+});
+
+app.post("/api/accounting/journal/post", (req, res) => {
+  const { lines, memo } = req.body;
+  if (!lines || !Array.isArray(lines) || lines.length < 2) {
+    return res.status(400).json({ error: "A valid General Journal entry requires at least 2 segments." });
+  }
+
+  let totalDebit = 0;
+  let totalCredit = 0;
+  for (const line of lines) {
+    if (line.type === 'Debit') {
+      totalDebit += Number(line.amount);
+    } else if (line.type === 'Credit') {
+      totalCredit += Number(line.amount);
+    }
+  }
+
+  if (totalDebit !== totalCredit) {
+    return res.status(400).json({ error: `Out of balance: Total Debits ($${totalDebit}) must equal Total Credits ($${totalCredit}).` });
+  }
+
+  for (const line of lines) {
+    const account = dbState.coa.find(c => c.code === line.accountCode);
+    if (account) {
+      if (line.type === 'Debit') {
+        if (typeof account.balance !== 'number') account.balance = 0;
+        if (account.type === 'Asset' || account.type === 'Expense') {
+          account.balance += Number(line.amount);
+        } else {
+          account.balance = Math.max(0, account.balance - Number(line.amount));
+        }
+      } else if (line.type === 'Credit') {
+        if (typeof account.balance !== 'number') account.balance = 0;
+        if (account.type === 'Liability' || account.type === 'Equity' || account.type === 'Revenue') {
+          account.balance += Number(line.amount);
+        } else {
+          account.balance = Math.max(0, account.balance - Number(line.amount));
+        }
+      }
+    }
+  }
+
+  const jnId = `jn-manual-${Date.now().toString().slice(-4)}`;
+  const newJournal = {
+    id: jnId,
+    memo,
+    date: new Date().toISOString().split('T')[0],
+    lines
+  };
+
+  dbState.journals.unshift(newJournal);
+
+  createEventLog(`[MANUAL GENERAL JOURNAL AUDIT] Journal Entry posted (ID: ${jnId}) with ${lines.length} segments balancing at $${totalDebit.toLocaleString()}`, "Accounting", "info");
+  res.json({ success: true, journal: newJournal });
 });
 
 

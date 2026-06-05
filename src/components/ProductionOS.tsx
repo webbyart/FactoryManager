@@ -353,23 +353,23 @@ export default function ProductionOS({ dbState, onRefresh, onNotify, userRole }:
                         <div className="p-3 bg-indigo-50/50 rounded-xl grid grid-cols-2 md:grid-cols-5 text-center text-xs gap-2 border border-indigo-100/40">
                           <div>
                             <p className="text-slate-500">Material Cost</p>
-                            <p className="font-semibold text-slate-800">${mo.costSummary.materialCost.toLocaleString()}</p>
+                            <p className="font-semibold text-slate-800">฿{mo.costSummary.materialCost.toLocaleString()}</p>
                           </div>
                           <div>
                             <p className="text-slate-500">Packaging</p>
-                            <p className="font-semibold text-slate-800">${mo.costSummary.packagingCost.toLocaleString()}</p>
+                            <p className="font-semibold text-slate-800">฿{mo.costSummary.packagingCost.toLocaleString()}</p>
                           </div>
                           <div>
                             <p className="text-slate-500">Labor/Hrs</p>
-                            <p className="font-semibold text-slate-800">${mo.costSummary.laborCost.toLocaleString()}</p>
+                            <p className="font-semibold text-slate-800">฿{mo.costSummary.laborCost.toLocaleString()}</p>
                           </div>
                           <div>
                             <p className="text-slate-500">Facility Overhead</p>
-                            <p className="font-semibold text-slate-800">${mo.costSummary.overheadCost.toLocaleString()}</p>
+                            <p className="font-semibold text-slate-800">฿{mo.costSummary.overheadCost.toLocaleString()}</p>
                           </div>
                           <div className="bg-emerald-50 px-2 py-1 rounded">
                             <p className="text-emerald-700 font-medium">Cost / Unit</p>
-                            <p className="font-bold text-emerald-800">${mo.costSummary.costPerPiece}</p>
+                            <p className="font-bold text-emerald-800">฿{mo.costSummary.costPerPiece}</p>
                           </div>
                         </div>
                       )}
@@ -440,7 +440,7 @@ export default function ProductionOS({ dbState, onRefresh, onNotify, userRole }:
                                 </td>
                                 <td className="py-2 text-right font-mono text-slate-800">{item.quantity} {mat?.unit}</td>
                                 <td className="py-2 text-right font-mono text-slate-400">
-                                  ${mat ? (item.quantity * mat.costPerUnit).toFixed(2) : '0.00'}
+                                  ฿{mat ? (item.quantity * mat.costPerUnit).toFixed(2) : '0.00'}
                                 </td>
                               </tr>
                             );
@@ -648,7 +648,7 @@ export default function ProductionOS({ dbState, onRefresh, onNotify, userRole }:
                           <td className="py-2.5 font-bold font-mono text-slate-800">{po.id}</td>
                           <td className="py-2.5 font-semibold">{po.supplierId}</td>
                           <td className="py-2.5 text-right font-mono text-slate-400">{po.prId || 'Direct'}</td>
-                          <td className="py-2.5 text-right font-semibold text-slate-700">${po.totalCost.toLocaleString()}</td>
+                          <td className="py-2.5 text-right font-semibold text-slate-700">฿{po.totalCost.toLocaleString()}</td>
                           <td className="py-2.5 text-right">
                             <span className="bg-amber-50 text-amber-700 px-2 py-0.5 rounded text-[10px] font-semibold">{po.status}</span>
                           </td>
@@ -791,7 +791,7 @@ export default function ProductionOS({ dbState, onRefresh, onNotify, userRole }:
                         <td className="py-3.5 px-4 text-right font-mono text-slate-500">{m.minStock}</td>
                         <td className="py-3.5 px-4 text-right font-bold font-mono text-slate-800">{m.stockLevel}</td>
                         <td className="py-3.5 px-4 text-center text-slate-500 font-medium">{m.unit}</td>
-                        <td className="py-3.5 px-4 text-right font-mono">${m.costPerUnit.toFixed(2)}</td>
+                        <td className="py-3.5 px-4 text-right font-mono">฿{m.costPerUnit.toFixed(2)}</td>
                         <td className="py-3.5 px-4 text-right">
                           <span className={`px-2.5 py-0.5 rounded text-[10px] font-bold ${
                             m.stockLevel >= m.minStock ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'
@@ -838,7 +838,7 @@ export default function ProductionOS({ dbState, onRefresh, onNotify, userRole }:
                   { key: 'stockLevel', label: 'คลังสะสมคงเหลือ', type: 'number' },
                   { key: 'minStock', label: 'ระดับเกณฑ์ขั้นต่ำ', type: 'number' },
                   { key: 'unit', label: 'หน่วยวัด', type: 'text' },
-                  { key: 'costPerUnit', label: 'ต้นทุนต่อหน่วย ($)', type: 'number' }
+                  { key: 'costPerUnit', label: 'ต้นทุนต่อหน่วย (บาท)', type: 'number' }
                 ] as any,
                 data: dbState.materials || []
               };

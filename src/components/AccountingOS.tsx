@@ -86,7 +86,7 @@ export default function AccountingOS({ dbState, onRefresh, onNotify, userRole }:
     const creditsValue = journalLines.filter(l => l.type === 'Credit').reduce((sum, l) => sum + l.amount, 0);
 
     if(debitsValue !== creditsValue) {
-      onNotify(`Double-entry disequilibrium: Total Debits ($${debitsValue}) must equal Total Credits ($${creditsValue}). Out of balance by $${Math.abs(debitsValue - creditsValue)}.`, "warning");
+      onNotify(`Double-entry disequilibrium: Total Debits (฿${debitsValue}) must equal Total Credits (฿${creditsValue}). Out of balance by ฿${Math.abs(debitsValue - creditsValue)}.`, "warning");
       return;
     }
 
@@ -228,7 +228,7 @@ export default function AccountingOS({ dbState, onRefresh, onNotify, userRole }:
 
                   <div className="text-right">
                     <p className="text-xs text-slate-400 font-medium">Balance Sheet Running Val</p>
-                    <p className="font-mono text-base font-bold text-slate-800">${account.balance.toLocaleString()}</p>
+                    <p className="font-mono text-base font-bold text-slate-800">฿{account.balance.toLocaleString()}</p>
                     <span className="text-[9px] uppercase font-bold text-teal-700 font-mono">Real-time synced</span>
                   </div>
                 </div>
@@ -367,7 +367,7 @@ export default function AccountingOS({ dbState, onRefresh, onNotify, userRole }:
 
                             <div className="text-right">
                               <span className={l.type === 'Debit' ? 'font-bold text-emerald-700' : 'text-slate-600'}>
-                                {l.type === 'Debit' ? `$${l.amount.toLocaleString()}` : `($${l.amount.toLocaleString()})`}
+                                {l.type === 'Debit' ? `฿${l.amount.toLocaleString()}` : `(฿${l.amount.toLocaleString()})`}
                               </span>
                             </div>
                           </div>
@@ -408,7 +408,7 @@ export default function AccountingOS({ dbState, onRefresh, onNotify, userRole }:
 
                   <div className="text-right md:px-6">
                     <p className="text-[10px] text-slate-500 font-medium">Invoice Value Balance</p>
-                    <p className="font-mono font-bold text-slate-800 text-base">${inv.amount.toLocaleString()}</p>
+                    <p className="font-mono font-bold text-slate-800 text-base">฿{inv.amount.toLocaleString()}</p>
                   </div>
 
                   {inv.status !== 'Paid' && isFinanceAuthorised && (
@@ -461,7 +461,7 @@ export default function AccountingOS({ dbState, onRefresh, onNotify, userRole }:
 
                   <div className="text-right md:px-6">
                     <p className="text-[10px] text-slate-500 font-medium">Liability Sum outstanding</p>
-                    <p className="font-mono font-bold text-slate-800 text-base">${bill.amount.toLocaleString()}</p>
+                    <p className="font-mono font-bold text-slate-800 text-base">฿{bill.amount.toLocaleString()}</p>
                   </div>
 
                   {bill.status !== 'Paid' && isFinanceAuthorised && (
@@ -496,8 +496,8 @@ export default function AccountingOS({ dbState, onRefresh, onNotify, userRole }:
                   <div key={ac.code} className="flex justify-between pb-1.5 border-b border-dashed border-slate-100 last:border-0 last:pb-0">
                     <span className="text-slate-600">{ac.name} ({ac.code})</span>
                     <div className="grid grid-cols-2 text-right w-44 font-semibold text-slate-850">
-                      <span>{(ac.type === 'Asset' || ac.type === 'Expense') ? `$${ac.balance.toLocaleString()}` : ''}</span>
-                      <span>{(ac.type === 'Liability' || ac.type === 'Equity' || ac.type === 'Revenue') ? `$${ac.balance.toLocaleString()}` : ''}</span>
+                      <span>{(ac.type === 'Asset' || ac.type === 'Expense') ? `฿${ac.balance.toLocaleString()}` : ''}</span>
+                      <span>{(ac.type === 'Liability' || ac.type === 'Equity' || ac.type === 'Revenue') ? `฿${ac.balance.toLocaleString()}` : ''}</span>
                     </div>
                   </div>
                 ))}
@@ -505,8 +505,8 @@ export default function AccountingOS({ dbState, onRefresh, onNotify, userRole }:
                 <div className="flex justify-between border-t-2 border-slate-800 pt-3 font-extrabold text-slate-900 text-sm">
                   <span>Balanced Aggregates Sum:</span>
                   <div className="grid grid-cols-2 text-right w-44">
-                    <span>${trialBalanceDebits.toLocaleString()}</span>
-                    <span>${trialBalanceCredits.toLocaleString()}</span>
+                    <span>฿{trialBalanceDebits.toLocaleString()}</span>
+                    <span>฿{trialBalanceCredits.toLocaleString()}</span>
                   </div>
                 </div>
                 
@@ -537,7 +537,7 @@ export default function AccountingOS({ dbState, onRefresh, onNotify, userRole }:
                   <p className="font-bold text-[10px] text-slate-500 uppercase tracking-wider">Gross Revenues</p>
                   <div className="flex justify-between">
                     <span>Wholesale Product Sales Revenue:</span>
-                    <span className="font-semibold text-slate-800">${totalRevenues.toLocaleString()}</span>
+                    <span className="font-semibold text-slate-800">฿{totalRevenues.toLocaleString()}</span>
                   </div>
                 </div>
 
@@ -546,15 +546,15 @@ export default function AccountingOS({ dbState, onRefresh, onNotify, userRole }:
                   <p className="font-bold text-[10px] text-slate-500 uppercase tracking-wider">Cost of Operations (Opex)</p>
                   <div className="flex justify-between">
                     <span>Wages & Payroll Expenses:</span>
-                    <span className="text-slate-700">${dbState.coa.find((ac: any)=> ac.code === '5010')?.balance.toLocaleString()}</span>
+                    <span className="text-slate-705">฿{dbState.coa.find((ac: any)=> ac.code === '5010')?.balance.toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Equipment Repair Maintenance:</span>
-                    <span className="text-slate-700">${dbState.coa.find((ac: any)=> ac.code === '5020')?.balance.toLocaleString()}</span>
+                    <span className="text-slate-705">฿{dbState.coa.find((ac: any)=> ac.code === '5020')?.balance.toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Industrial Raw Materials OPEX:</span>
-                    <span className="text-slate-700">${dbState.coa.find((ac: any)=> ac.code === '5030')?.balance.toLocaleString()}</span>
+                    <span className="text-slate-705">฿{dbState.coa.find((ac: any)=> ac.code === '5030')?.balance.toLocaleString()}</span>
                   </div>
                 </div>
 
@@ -562,12 +562,12 @@ export default function AccountingOS({ dbState, onRefresh, onNotify, userRole }:
                 <div className="space-y-1.5 pt-2">
                   <div className="flex justify-between text-slate-600">
                     <span>Total Raw Operational OPEX:</span>
-                    <span>${totalOperatingExpenses.toLocaleString()}</span>
+                    <span>฿{totalOperatingExpenses.toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between font-extrabold text-sm pt-2 text-slate-900 border-t-2 border-slate-900">
                     <span>NET ACCOUNT INCOME:</span>
                     <span className={netEarnings >= 0 ? "text-emerald-700 bg-emerald-50 px-2 rounded" : "text-rose-700"}>
-                      {netEarnings >= 0 ? `$${netEarnings.toLocaleString()}` : `($${Math.abs(netEarnings).toLocaleString()})`}
+                      {netEarnings >= 0 ? `฿${netEarnings.toLocaleString()}` : `(฿${Math.abs(netEarnings).toLocaleString()})`}
                     </span>
                   </div>
                 </div>
@@ -591,7 +591,7 @@ export default function AccountingOS({ dbState, onRefresh, onNotify, userRole }:
                   { key: 'code', label: 'เลขรหัสบัญชี', type: 'text' },
                   { key: 'name', label: 'บัญชีควบคุมยอดรายชื่อ', type: 'text' },
                   { key: 'type', label: 'กลุ่มประเภทผังบัญชี', type: 'select', options: ['Asset', 'Liability', 'Equity', 'Revenue', 'Expense'] },
-                  { key: 'balance', label: 'ยอดดุลบัญชีสะสม ($)', type: 'number' }
+                  { key: 'balance', label: 'ยอดดุลบัญชีสะสม (บาท)', type: 'number' }
                 ] as any,
                 data: dbState.coa || []
               };
@@ -604,7 +604,7 @@ export default function AccountingOS({ dbState, onRefresh, onNotify, userRole }:
                   { key: 'date', label: 'วันที่ทำการบันทึก', type: 'date' },
                   { key: 'type', label: 'ฝั่งการโอน', type: 'select', options: ['Debit', 'Credit'] },
                   { key: 'category', label: 'หมวดหมู่งบสะสม', type: 'text' },
-                  { key: 'amount', label: 'มูลค่ารวมดีล ($)', type: 'number' },
+                  { key: 'amount', label: 'มูลค่ารวมดีล (บาท)', type: 'number' },
                   { key: 'description', label: 'บันทึกเหตุช่วยจำเพิ่มเติม', type: 'text' }
                 ] as any,
                 data: dbState.transactions || []
@@ -616,7 +616,7 @@ export default function AccountingOS({ dbState, onRefresh, onNotify, userRole }:
                 columns: [
                   { key: 'id', label: 'รหัสใบแจ้งหนี้ (Invoice ID)', type: 'text', readOnly: true },
                   { key: 'customerId', label: 'รหัสลูกค้าหลัก', type: 'text' },
-                  { key: 'amount', label: 'รวมหน้าตั๋วค้างจ่าย ($)', type: 'number' },
+                  { key: 'amount', label: 'รวมหน้าตั๋วค้างจ่าย (บาท)', type: 'number' },
                   { key: 'dueDate', label: 'กำหนดวันชำระหลัก', type: 'date' },
                   { key: 'status', label: 'สถานะตรวจสอบดีล', type: 'select', options: ['Unpaid', 'Paid', 'Overdue'] }
                 ] as any,
@@ -629,7 +629,7 @@ export default function AccountingOS({ dbState, onRefresh, onNotify, userRole }:
                 columns: [
                   { key: 'id', label: 'รหัสตั๋วเจ้าหนี้ (Bill ID)', type: 'text', readOnly: true },
                   { key: 'supplierId', label: 'รหัสซัพพลายเออร์', type: 'text' },
-                  { key: 'amount', label: 'ยอดชำระตั๋วเก็บรายจ่าย ($)', type: 'number' },
+                  { key: 'amount', label: 'ยอดชำระตั๋วเก็บรายจ่าย (บาท)', type: 'number' },
                   { key: 'dueDate', label: 'กำหนดชำระตั๋วซ่อม', type: 'date' },
                   { key: 'status', label: 'สถานะดีลตั๋วหลัก', type: 'select', options: ['Unpaid', 'Paid', 'Overdue'] }
                 ] as any,

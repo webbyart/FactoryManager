@@ -392,7 +392,7 @@ export default function HRPayrollOS({ dbState, onRefresh, onNotify, userRole }: 
 
                   <div className="flex justify-between font-extrabold text-sm pt-4">
                     <span>NET DISBURSED INCOME:</span>
-                    <span className="text-emerald-700 bg-emerald-50 px-3 rounded">${printingSlip.netPay.toLocaleString()}</span>
+                    <span className="text-emerald-700 bg-emerald-50 px-3 rounded">฿{printingSlip.netPay.toLocaleString()}</span>
                   </div>
 
                   <div className="text-center text-[8px] text-slate-400 mt-8">
@@ -475,11 +475,11 @@ export default function HRPayrollOS({ dbState, onRefresh, onNotify, userRole }: 
                         <tr key={slip.id} className="border-b border-slate-100 hover:bg-slate-50 transition-colors">
                           <td className="py-3.5 px-4 font-mono font-bold text-slate-800">{slip.id}</td>
                           <td className="py-3.5 px-4 font-semibold text-slate-800">{emp ? emp.name : slip.employeeId}</td>
-                          <td className="py-3.5 px-4 text-right font-mono">${slip.baseSalary.toLocaleString()}</td>
-                          <td className="py-3.5 px-4 text-right font-mono">${slip.otPay.toLocaleString()}</td>
-                          <td className="py-3.5 px-4 text-right font-mono">${slip.allowanceSum.toLocaleString()}</td>
-                          <td className="py-3.5 px-4 text-right font-mono text-rose-600">-${(slip.taxDeduction + slip.ssoDeduction).toLocaleString()}</td>
-                          <td className="py-3.5 px-4 text-right font-bold text-slate-800 font-mono">${slip.netPay.toLocaleString()}</td>
+                          <td className="py-3.5 px-4 text-right font-mono">฿{slip.baseSalary.toLocaleString()}</td>
+                          <td className="py-3.5 px-4 text-right font-mono">฿{slip.otPay.toLocaleString()}</td>
+                          <td className="py-3.5 px-4 text-right font-mono">฿{slip.allowanceSum.toLocaleString()}</td>
+                          <td className="py-3.5 px-4 text-right font-mono text-rose-600">-฿{(slip.taxDeduction + slip.ssoDeduction).toLocaleString()}</td>
+                          <td className="py-3.5 px-4 text-right font-bold text-slate-800 font-mono">฿{slip.netPay.toLocaleString()}</td>
                           <td className="py-3.5 px-4 text-right">
                             <button
                               type="button"
@@ -514,7 +514,7 @@ export default function HRPayrollOS({ dbState, onRefresh, onNotify, userRole }: 
                   { key: 'name', label: 'ชื่อ-นามสกุล', type: 'text' },
                   { key: 'department', label: 'แผนก/ฝ่ายสังกัด', type: 'text' },
                   { key: 'role', label: 'ตำแหน่งงาน', type: 'text' },
-                  { key: 'baseSalary', label: 'เงินเดือนพื้นฐาน ($)', type: 'number' },
+                  { key: 'baseSalary', label: 'เงินเดือนพื้นฐาน (บาท)', type: 'number' },
                   { key: 'status', label: 'สถานะการทำงาน', type: 'select', options: ['Active', 'Inactive', 'On Leave'] }
                 ] as any,
                 data: dbState.employees || []
