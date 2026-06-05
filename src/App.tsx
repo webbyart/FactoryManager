@@ -231,8 +231,8 @@ export default function App() {
             <Building className="h-5 w-5" />
           </div>
           <div>
-            <h1 className="font-semibold text-xs tracking-wider font-sans text-[#1D1D1F]">ระบบผลิตน้ำหอมอัจฉริยะ</h1>
-            <p className="text-[9px] text-[#86868B] font-bold uppercase tracking-widest mt-0.5">โรงงานปรุงผสมน้ำหอมระดับวิสาหกิจ</p>
+            <h1 className="font-semibold text-xs tracking-wider font-sans text-[#1D1D1F]">IDEVA Factory OS</h1>
+            <p className="text-[9px] text-[#86868B] font-bold uppercase tracking-widest mt-0.5">ระบบควบคุมโรงงานอัจฉริยะ</p>
           </div>
         </div>
 
