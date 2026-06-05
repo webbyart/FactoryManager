@@ -6,7 +6,8 @@ import {
 import { 
   Building, Layers, Wrench, Users, DollarSign, Cpu, AlertTriangle, 
   ShieldCheck, RefreshCw, MessageSquare, Terminal, Eye, Bell, Check, 
-  QrCode, Play, ChevronRight, User, Settings, Info, BrainCircuit
+  QrCode, Play, ChevronRight, User, Settings, Info, BrainCircuit, Beaker, Clipboard,
+  MoreHorizontal, X
 } from 'lucide-react';
 
 // Subcomponents import
@@ -16,6 +17,9 @@ import HRPayrollOS from './components/HRPayrollOS';
 import AccountingOS from './components/AccountingOS';
 import DeveloperOS from './components/DeveloperOS';
 import DashboardQuickTable from './components/DashboardQuickTable';
+import PerfumeFormulaOS from './components/PerfumeFormulaOS';
+import ChemicalStockOS from './components/ChemicalStockOS';
+import GMPHubOS from './components/GMPHubOS';
 
 import { 
   DEPARTMENTS, ROLES, EMPLOYEES, CUSTOMERS, SUPPLIERS, PRODUCTS, MATERIALS, 
@@ -94,7 +98,8 @@ export default function App() {
   const [dbState, setDbState] = useState<any>(INITIAL_DB_STATE);
   const [loading, setLoading] = useState<boolean>(false);
   const [userRole, setUserRole] = useState<string>('Admin'); // Interactive RBAC
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'production' | 'maintenance' | 'hr' | 'accounting' | 'developer' | 'copilot'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'production' | 'maintenance' | 'hr' | 'accounting' | 'developer' | 'copilot' | 'perfume-formulas' | 'chemical-stocks' | 'gmp-hub'>('dashboard');
+  const [drawerOpen, setDrawerOpen] = useState<boolean>(false);
   
   // Notification logs toast state
   const [toasts, setToasts] = useState<{ id: string, msg: string, type: 'info' | 'warning' | 'error' }[]>([]);
@@ -117,8 +122,16 @@ export default function App() {
   const fetchState = async () => {
     try {
       const response = await fetch('/api/state');
+      if (!response.ok) {
+        throw new Error("Failed to fetch state from backend");
+      }
       const data = await response.json();
-      setDbState(data);
+      if (data && typeof data === 'object') {
+        setDbState((prev: any) => ({
+          ...prev,
+          ...data
+        }));
+      }
     } catch (e) {
       addToast("Failed to connect to backend server.", "error");
     } finally {
@@ -232,15 +245,31 @@ export default function App() {
             onClick={() => setActiveTab('dashboard')}
             className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium transition-all duration-150 ${
               activeTab === 'dashboard' 
-                ? 'bg-[#1D1D1F] text-white shadow-sm' 
+                ? 'bg-[#1D1D1F] text-white shadow-sm font-semibold' 
                 : 'text-[#1D1D1F] hover:bg-[#E8E8ED]/80'
             }`}
           >
             <span className="flex items-center gap-2.5">
               <Layers className={`h-4 w-4 ${activeTab === 'dashboard' ? 'text-white' : 'text-[#86868B]'}`} /> 
-              แผงวิเคราะห์และควบคุม OEE
+              แดชบอร์ด OEE
             </span>
             <ChevronRight className={`h-3 w-3 transition-transform ${activeTab === 'dashboard' ? 'translate-x-0.5 text-white' : 'text-slate-400'}`} />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('gmp-hub')}
+            className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium transition-all duration-150 ${
+              activeTab === 'gmp-hub' 
+                ? 'bg-[#1D1D1F] text-white shadow-sm font-semibold' 
+                : 'text-[#1D1D1F] hover:bg-[#E8E8ED]/80'
+            }`}
+          >
+            <span className="flex items-center gap-2.5">
+              <ShieldCheck className={`h-4 w-4 ${activeTab === 'gmp-hub' ? 'text-white' : 'text-[#86868B]'}`} /> 
+              มาตรฐาน GMP
+            </span>
+            <ChevronRight className={`h-3 w-3 transition-transform ${activeTab === 'gmp-hub' ? 'translate-x-0.5 text-white' : 'text-slate-400'}`} />
           </button>
 
           <button
@@ -248,13 +277,13 @@ export default function App() {
             onClick={() => setActiveTab('production')}
             className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium transition-all duration-150 ${
               activeTab === 'production' 
-                ? 'bg-[#1D1D1F] text-white shadow-sm' 
+                ? 'bg-[#1D1D1F] text-white shadow-sm font-semibold' 
                 : 'text-[#1D1D1F] hover:bg-[#E8E8ED]/80'
             }`}
           >
             <span className="flex items-center gap-2.5">
               <Cpu className={`h-4 w-4 ${activeTab === 'production' ? 'text-white' : 'text-[#86868B]'}`} /> 
-              ระบบการกลั่นปรุงและผสมสารน้ำหอม
+              ไลน์กวนผสมน้ำหอม
             </span>
             <ChevronRight className={`h-3 w-3 transition-transform ${activeTab === 'production' ? 'translate-x-0.5 text-white' : 'text-slate-400'}`} />
           </button>
@@ -264,13 +293,13 @@ export default function App() {
             onClick={() => setActiveTab('maintenance')}
             className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium transition-all duration-150 ${
               activeTab === 'maintenance' 
-                ? 'bg-[#1D1D1F] text-white shadow-sm' 
+                ? 'bg-[#1D1D1F] text-white shadow-sm font-semibold' 
                 : 'text-[#1D1D1F] hover:bg-[#E8E8ED]/80'
             }`}
           >
             <span className="flex items-center gap-2.5">
               <Wrench className={`h-4 w-4 ${activeTab === 'maintenance' ? 'text-white' : 'text-[#86868B]'}`} /> 
-              การซ่อมบำรุงท่อกลั่นและเครื่องจักร
+              การซ่อมบำรุง
             </span>
             <ChevronRight className={`h-3 w-3 transition-transform ${activeTab === 'maintenance' ? 'translate-x-0.5 text-white' : 'text-slate-400'}`} />
           </button>
@@ -280,13 +309,13 @@ export default function App() {
             onClick={() => setActiveTab('hr')}
             className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium transition-all duration-150 ${
               activeTab === 'hr' 
-                ? 'bg-[#1D1D1F] text-white shadow-sm' 
+                ? 'bg-[#1D1D1F] text-white shadow-sm font-semibold' 
                 : 'text-[#1D1D1F] hover:bg-[#E8E8ED]/80'
             }`}
           >
             <span className="flex items-center gap-2.5">
               <Users className={`h-4 w-4 ${activeTab === 'hr' ? 'text-white' : 'text-[#86868B]'}`} /> 
-              พนักงานและเงินเดือนผู้ดลกลั่น
+              บุคลากร/เงินเดือน
             </span>
             <ChevronRight className={`h-3 w-3 transition-transform ${activeTab === 'hr' ? 'translate-x-0.5 text-white' : 'text-slate-400'}`} />
           </button>
@@ -296,13 +325,13 @@ export default function App() {
             onClick={() => setActiveTab('accounting')}
             className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium transition-all duration-150 ${
               activeTab === 'accounting' 
-                ? 'bg-[#1D1D1F] text-white shadow-sm' 
+                ? 'bg-[#1D1D1F] text-white shadow-sm font-semibold' 
                 : 'text-[#1D1D1F] hover:bg-[#E8E8ED]/80'
             }`}
           >
             <span className="flex items-center gap-2.5">
               <DollarSign className={`h-4 w-4 ${activeTab === 'accounting' ? 'text-white' : 'text-[#86868B]'}`} /> 
-              บัญชีแยกประเภท คลังวัตถุดิบและจัดซื้อ
+              งานบัญชี/จัดซื้อ
             </span>
             <ChevronRight className={`h-3 w-3 transition-transform ${activeTab === 'accounting' ? 'translate-x-0.5 text-white' : 'text-slate-400'}`} />
           </button>
@@ -311,16 +340,48 @@ export default function App() {
 
           <button
             type="button"
+            onClick={() => setActiveTab('perfume-formulas')}
+            className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium transition-all duration-150 ${
+              activeTab === 'perfume-formulas' 
+                ? 'bg-[#1D1D1F] text-white shadow-sm font-semibold' 
+                : 'text-[#1D1D1F] hover:bg-[#E8E8ED]/80'
+            }`}
+          >
+            <span className="flex items-center gap-2.5">
+              <Beaker className={`h-4 w-4 ${activeTab === 'perfume-formulas' ? 'text-white' : 'text-[#86868B]'}`} /> 
+              สูตรวิจัย (R&D)
+            </span>
+            <ChevronRight className={`h-3 w-3 transition-transform ${activeTab === 'perfume-formulas' ? 'translate-x-0.5 text-white' : 'text-slate-400'}`} />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('chemical-stocks')}
+            className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium transition-all duration-150 ${
+              activeTab === 'chemical-stocks' 
+                ? 'bg-[#1D1D1F] text-white shadow-sm font-semibold' 
+                : 'text-[#1D1D1F] hover:bg-[#E8E8ED]/80'
+            }`}
+          >
+            <span className="flex items-center gap-2.5">
+              <Clipboard className={`h-4 w-4 ${activeTab === 'chemical-stocks' ? 'text-white' : 'text-[#86868B]'}`} /> 
+              คลังสารเคมีดิบ
+            </span>
+            <ChevronRight className={`h-3 w-3 transition-transform ${activeTab === 'chemical-stocks' ? 'translate-x-0.5 text-white' : 'text-slate-400'}`} />
+          </button>
+
+          <button
+            type="button"
             onClick={() => setActiveTab('copilot')}
             className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-medium transition-all duration-150 ${
               activeTab === 'copilot' 
-                ? 'bg-[#1D1D1F] text-white shadow-sm' 
+                ? 'bg-[#1D1D1F] text-white shadow-sm font-semibold' 
                 : 'text-[#1D1D1F] hover:bg-[#E8E8ED]/80'
             }`}
           >
             <span className="flex items-center gap-2.5">
               <BrainCircuit className={`h-4 w-4 ${activeTab === 'copilot' ? 'text-white' : 'text-[#86868B]'}`} /> 
-              ผู้ช่วยปัญญาประดิษฐ์สเกลและปรับปรุงสูตร
+              บอทสมองกล AI
             </span>
             <ChevronRight className={`h-3 w-3 transition-transform ${activeTab === 'copilot' ? 'translate-x-0.5 text-white' : 'text-slate-400'}`} />
           </button>
@@ -338,7 +399,7 @@ export default function App() {
           >
             <span className="flex items-center gap-2.5">
               <Terminal className={`h-4 w-4 ${activeTab === 'developer' ? 'text-[#1D1D1F]' : 'text-[#86868B]'}`} /> 
-              กระดานเช็คคำสั่ง SQL สำหรับโปรแกรมเมอร์
+              คิวรี่ SQL
             </span>
             <ChevronRight className={`h-3 w-3 transition-transform ${activeTab === 'developer' ? 'translate-x-0.5 text-[#1D1D1F]' : 'text-slate-400'}`} />
           </button>
@@ -398,7 +459,7 @@ export default function App() {
         </header>
 
         {/* CONTAINER CONTENT AREA CONTAINER */}
-        <section className="flex-1 overflow-y-auto p-6 space-y-6">
+        <section className="flex-1 overflow-y-auto p-6 pb-24 md:pb-6 space-y-6">
           
           {/* TOAST NOTIFICATION STACK OVERLAY */}
           <div className="fixed top-20 right-6 z-50 flex flex-col gap-2 max-w-sm pointer-events-none">
@@ -417,8 +478,9 @@ export default function App() {
             ))}
           </div>
 
-          <div className="md:hidden bg-[#FF9500]/15 text-[#FF9500] font-semibold text-xs border border-[#FF9500]/30 p-3 rounded-xl mb-4">
-            Notice: Mobile optimization is active. Access side modules via the sidebar or open from an executive viewport.
+          <div className="md:hidden bg-neutral-900 text-white font-semibold text-xs border border-neutral-950 p-3 rounded-2xl mb-4 flex justify-between items-center shadow-xs select-none">
+            <span>📱 ระบบนำทาง IDEVA Mobile OS ทำงานราบรื่น</span>
+            <span className="text-[9px] uppercase tracking-widest bg-white/15 px-2 py-0.5 rounded-lg text-emerald-300 font-extrabold font-mono animate-pulse">● Live</span>
           </div>
 
           {/* TAB CONTENT SWITCH RULES */}
@@ -661,6 +723,33 @@ export default function App() {
             />
           )}
 
+          {activeTab === 'perfume-formulas' && (
+            <PerfumeFormulaOS 
+              dbState={dbState} 
+              onRefresh={fetchState} 
+              onNotify={addToast} 
+              userRole={userRole} 
+            />
+          )}
+
+          {activeTab === 'chemical-stocks' && (
+            <ChemicalStockOS 
+              dbState={dbState} 
+              onRefresh={fetchState} 
+              onNotify={addToast} 
+              userRole={userRole} 
+            />
+          )}
+
+          {activeTab === 'gmp-hub' && (
+            <GMPHubOS 
+              dbState={dbState} 
+              onRefresh={fetchState} 
+              onNotify={addToast} 
+              userRole={userRole} 
+            />
+          )}
+
           {activeTab === 'copilot' && (
             <div className="bg-white p-6 rounded-3xl border border-[#E5E5EA] shadow-sm max-w-4xl mx-auto space-y-6 animate-fade-in" id="ai-intelligence-panel">
               <div className="flex items-center gap-3 border-b border-[#E5E5EA] pb-4">
@@ -761,6 +850,202 @@ export default function App() {
 
         </section>
       </main>
+
+      {/* 📱 iOS-Style Bottom Navigation Bar (Mobile Only) */}
+      <div className="md:hidden fixed bottom-3 left-3 right-3 z-40 bg-white/80 backdrop-blur-md border border-[#E5E5EA] rounded-2xl shadow-xl flex justify-around items-center py-2 px-1 text-center select-none">
+        
+        {/* Tab 1: Dashboard OEE */}
+        <button
+          type="button"
+          onClick={() => { setActiveTab('dashboard'); setDrawerOpen(false); }}
+          className={`flex flex-col items-center gap-1 py-1.5 flex-1 transition-all ${
+            activeTab === 'dashboard' ? 'text-[#0071E3] scale-102 font-bold' : 'text-[#86868B]'
+          }`}
+        >
+          <Layers className="h-4.5 w-4.5" />
+          <span className="text-[9px] font-sans font-semibold tracking-tight">แดชบอร์ด OEE</span>
+        </button>
+
+        {/* Tab 2: มาตรฐาน GMP */}
+        <button
+          type="button"
+          onClick={() => { setActiveTab('gmp-hub'); setDrawerOpen(false); }}
+          className={`flex flex-col items-center gap-1 py-1.5 flex-1 transition-all ${
+            activeTab === 'gmp-hub' ? 'text-[#34C759] scale-102 font-bold' : 'text-[#86868B]'
+          }`}
+        >
+          <ShieldCheck className="h-4.5 w-4.5" />
+          <span className="text-[9px] font-sans font-semibold tracking-tight">มาตรฐาน GMP</span>
+        </button>
+
+        {/* Tab 3: คลังเคมี */}
+        <button
+          type="button"
+          onClick={() => { setActiveTab('chemical-stocks'); setDrawerOpen(false); }}
+          className={`flex flex-col items-center gap-1 py-1.5 flex-1 transition-all ${
+            activeTab === 'chemical-stocks' ? 'text-[#0071E3] scale-102 font-bold' : 'text-[#86868B]'
+          }`}
+        >
+          <Clipboard className="h-4.5 w-4.5" />
+          <span className="text-[9px] font-sans font-semibold tracking-tight">คลังสารเคมี</span>
+        </button>
+
+        {/* Tab 4: สูตรวิจัย (R&D) */}
+        <button
+          type="button"
+          onClick={() => { setActiveTab('perfume-formulas'); setDrawerOpen(false); }}
+          className={`flex flex-col items-center gap-1 py-1.5 flex-1 transition-all ${
+            activeTab === 'perfume-formulas' ? 'text-[#0071E3] scale-102 font-bold' : 'text-[#86868B]'
+          }`}
+        >
+          <Beaker className="h-4.5 w-4.5" />
+          <span className="text-[9px] font-sans font-semibold tracking-tight">สูตรวิจัย (R&D)</span>
+        </button>
+
+        {/* Tab 5: เพิ่มเติม (•••) */}
+        <button
+          type="button"
+          onClick={() => setDrawerOpen(prev => !prev)}
+          className={`flex flex-col items-center gap-1 py-1.5 flex-1 transition-all ${
+            drawerOpen ? 'text-neutral-950 scale-102 font-bold' : 'text-[#86868B]'
+          }`}
+        >
+          <MoreHorizontal className="h-4.5 w-4.5" />
+          <span className="text-[9px] font-sans font-semibold tracking-tight">เพิ่มเติม</span>
+        </button>
+
+      </div>
+
+      {/* 📱 Sleek Menu Drawer (Mobile Only) */}
+      {drawerOpen && (
+        <div className="md:hidden fixed inset-0 z-45 bg-black/40 backdrop-blur-xs flex flex-col justify-end transition-opacity" onClick={() => setDrawerOpen(false)}>
+          <div 
+            className="bg-white rounded-t-3xl border-t border-[#E5E5EA] shadow-2xl p-5 pb-20 space-y-4 max-h-[75vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-[#E5E5EA] pb-3">
+              <div>
+                <h3 className="text-sm font-bold text-[#1D1D1F]">เมนูระบบงานเพิ่มเติม (Factory Desk)</h3>
+                <p className="text-[10px] text-[#86868B]">คลิกเพื่อสลับเข้าสู่ห้องปฏิบัติการโรงงานส่วนอื่น</p>
+              </div>
+              <button 
+                type="button" 
+                onClick={() => setDrawerOpen(false)}
+                className="p-1.5 hover:bg-neutral-100 rounded-full text-slate-400"
+              >
+                <X className="h-4.5 w-4.5" />
+              </button>
+            </div>
+
+            {/* Blocks Grid Dual block system requested */}
+            <div className="grid grid-cols-2 gap-3 pb-4 select-none">
+              
+              {/* Block 1: ไลน์ผสม (activeTab === 'production') */}
+              <button
+                type="button"
+                onClick={() => { setActiveTab('production'); setDrawerOpen(false); }}
+                className={`p-4 rounded-2xl border text-left transition-all flex flex-col justify-between h-24 ${
+                  activeTab === 'production' 
+                    ? 'bg-neutral-900 border-neutral-950 text-white shadow-md' 
+                    : 'bg-[#F5F5F7] border-[#E5E5EA] text-[#1D1D1F] hover:bg-white'
+                }`}
+              >
+                <Cpu className="h-5 w-5 text-[#FF9500]" />
+                <div>
+                  <strong className="text-xs font-semibold block">ไลน์กวนผสมสาร</strong>
+                  <span className="text-[9px] opacity-75">ใบโมเดิ้ลคุมถัง BPR</span>
+                </div>
+              </button>
+
+              {/* Block 2: ซ่อมบำรุง (activeTab === 'maintenance') */}
+              <button
+                type="button"
+                onClick={() => { setActiveTab('maintenance'); setDrawerOpen(false); }}
+                className={`p-4 rounded-2xl border text-left transition-all flex flex-col justify-between h-24 ${
+                  activeTab === 'maintenance' 
+                    ? 'bg-neutral-900 border-neutral-950 text-white shadow-md' 
+                    : 'bg-[#F5F5F7] border-[#E5E5EA] text-[#1D1D1F] hover:bg-white'
+                }`}
+              >
+                <Wrench className="h-5 w-5 text-[#34C759]" />
+                <div>
+                  <strong className="text-xs font-semibold block">การซ่อมบำรุง</strong>
+                  <span className="text-[9px] opacity-75">รักษามอเตอร์/ฟิวเตอร์</span>
+                </div>
+              </button>
+
+              {/* Block 3: งานบัญชี/จัดซื้อ (activeTab === 'accounting') */}
+              <button
+                type="button"
+                onClick={() => { setActiveTab('accounting'); setDrawerOpen(false); }}
+                className={`p-4 rounded-2xl border text-left transition-all flex flex-col justify-between h-24 ${
+                  activeTab === 'accounting' 
+                    ? 'bg-neutral-900 border-neutral-950 text-white shadow-md' 
+                    : 'bg-[#F5F5F7] border-[#E5E5EA] text-[#1D1D1F] hover:bg-white'
+                }`}
+              >
+                <DollarSign className="h-5 w-5 text-[#0071E3]" />
+                <div>
+                  <strong className="text-xs font-semibold block">งานบัญชี/จัดซื้อ</strong>
+                  <span className="text-[9px] opacity-75">คุมสถานะบิลจัดจ่าย</span>
+                </div>
+              </button>
+
+              {/* Block 4: บุคลากร (activeTab === 'hr') */}
+              <button
+                type="button"
+                onClick={() => { setActiveTab('hr'); setDrawerOpen(false); }}
+                className={`p-4 rounded-2xl border text-left transition-all flex flex-col justify-between h-24 ${
+                  activeTab === 'hr' 
+                    ? 'bg-neutral-900 border-neutral-950 text-white shadow-md' 
+                    : 'bg-[#F5F5F7] border-[#E5E5EA] text-[#1D1D1F] hover:bg-white'
+                }`}
+              >
+                <Users className="h-5 w-5 text-[#BF5AF2]" />
+                <div>
+                  <strong className="text-xs font-semibold block">ฝ่ายบุคคล</strong>
+                  <span className="text-[9px] opacity-75">ลงเวลาและสลิปเงินกลั่น</span>
+                </div>
+              </button>
+
+              {/* Block 5: คิวรี่ SQL (activeTab === 'developer') */}
+              <button
+                type="button"
+                onClick={() => { setActiveTab('developer'); setDrawerOpen(false); }}
+                className={`p-4 rounded-2xl border text-left transition-all flex flex-col justify-between h-24 ${
+                  activeTab === 'developer' 
+                    ? 'bg-neutral-900 border-neutral-950 text-white shadow-md' 
+                    : 'bg-[#F5F5F7] border-[#E5E5EA] text-[#1D1D1F] hover:bg-white'
+                }`}
+              >
+                <Terminal className="h-5 w-5 text-gray-400 font-mono" />
+                <div>
+                  <strong className="text-xs font-mono font-semibold block">คิวรี่ SQL</strong>
+                  <span className="text-[9px] opacity-75 font-mono">Developer Dashboard</span>
+                </div>
+              </button>
+
+              {/* Block 6: บอทสมองกล AI (activeTab === 'copilot') */}
+              <button
+                type="button"
+                onClick={() => { setActiveTab('copilot'); setDrawerOpen(false); }}
+                className={`p-4 rounded-2xl border text-left transition-all flex flex-col justify-between h-24 ${
+                  activeTab === 'copilot' 
+                    ? 'bg-neutral-900 border-neutral-950 text-white shadow-md' 
+                    : 'bg-[#F5F5F7] border-[#E5E5EA] text-[#1D1D1F] hover:bg-white'
+                }`}
+              >
+                <BrainCircuit className="h-5 w-5 text-indigo-500 animate-pulse" />
+                <div>
+                  <strong className="text-xs font-semibold block">บอทสมองกล AI</strong>
+                  <span className="text-[9px] opacity-75 font-sans animate-fade-in">สเกลโครงข่ายข้อมูลจริง</span>
+                </div>
+              </button>
+
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -35,7 +35,8 @@ export const EMPLOYEES: Employee[] = [
   { id: 'emp-104', name: 'ดร. ลลิตา วรโชติสกุล', email: 'lalita@factory.com', departmentId: 'dept-3', roleId: 'role-qc', status: 'Active', salary: 68000, allowance: 4000, joiningDate: '2024-03-01', skills: ['Gas Chromatography-Mass Spectrometry (GC-MS)', 'ISO 22716 Cosmetics GMP', 'Sensory Evaluation'] },
   { id: 'emp-105', name: 'สมชาย ไวกิจการ', email: 'somchai@factory.com', departmentId: 'dept-4', roleId: 'role-maint', status: 'Active', salary: 72000, allowance: 5000, joiningDate: '2023-11-20', skills: ['Pneumatic Pumps', 'Aerosol Filling Line Maintenance', 'Autoclaves Repair'] },
   { id: 'emp-106', name: 'ศิริพร บุญครองกุล', email: 'siriporn@factory.com', departmentId: 'dept-6', roleId: 'role-acc', status: 'Active', salary: 85000, allowance: 3000, joiningDate: '2023-08-15', skills: ['BOI Tax Incentives', 'Standard Costing', 'Inventory Audit'] },
-  { id: 'emp-107', name: 'ดร. นิรุตต์ ตั้งจิตประสงค์', email: 'niroot@factory.com', departmentId: 'dept-2', roleId: 'role-rd', status: 'Active', salary: 95000, allowance: 8000, joiningDate: '2022-09-01', skills: ['Scent Engineering', 'Synthetics Sourcing', 'GC-MS Spectroscopy'] }
+  { id: 'emp-107', name: 'ดร. นิรุตต์ ตั้งจิตประสงค์', email: 'niroot@factory.com', departmentId: 'dept-2', roleId: 'role-rd', status: 'Active', salary: 95000, allowance: 8000, joiningDate: '2022-09-01', skills: ['Scent Engineering', 'Synthetics Sourcing', 'GC-MS Spectroscopy'] },
+  { id: 'emp-999', name: 'นายกิตติ์ธนา คำมูล', email: 'kittithana.km@factory.com', departmentId: 'dept-4', roleId: 'role-maint', status: 'Active', salary: 14000, allowance: 0, joiningDate: '2020-04-12', skills: ['Computer Networking', 'IoT Systems', 'Database Admin'], lineUserId: 'Ue26ade3b0cd4d6eda90f72436e4c5a43', citizenId: '1-1022-00543-12-9' }
 ];
 
 export const CUSTOMERS: Customer[] = [
@@ -244,7 +245,8 @@ export const PAYROLL_PERIODS: PayrollPeriod[] = [
 
 export const PAYSLIPS: Payslip[] = [
   { id: 'slip-501', payrollPeriodId: 'payp-05', employeeId: 'emp-103', baseSalary: 65000, otPay: 4800, allowanceSum: 6000, bonus: 0, ssoDeduction: 750, taxDeduction: 3500, netPay: 71550, pdfGenerated: true },
-  { id: 'slip-502', payrollPeriodId: 'payp-05', employeeId: 'emp-105', baseSalary: 72000, otPay: 2100, allowanceSum: 5000, bonus: 5000, ssoDeduction: 750, taxDeduction: 4200, netPay: 79150, pdfGenerated: true }
+  { id: 'slip-502', payrollPeriodId: 'payp-05', employeeId: 'emp-105', baseSalary: 72000, otPay: 2100, allowanceSum: 5000, bonus: 5000, ssoDeduction: 750, taxDeduction: 4200, netPay: 79150, pdfGenerated: true },
+  { id: 'slip-999', payrollPeriodId: 'payp-05', employeeId: 'emp-999', baseSalary: 14000, otPay: 0, allowanceSum: 0, bonus: 0, ssoDeduction: 700, taxDeduction: 0, netPay: 13300, pdfGenerated: true }
 ];
 
 export const TRANSACTIONS: AccountTransaction[] = [

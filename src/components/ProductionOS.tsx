@@ -4,6 +4,7 @@ import {
   Settings, ShoppingCart, TrendingUp, HelpCircle, Archive, AlertTriangle, ArrowRight
 } from 'lucide-react';
 import GoogleSheetEditor from './GoogleSheetEditor';
+import BPRDocumentOS from './BPRDocumentOS';
 
 interface ProductionOSProps {
   dbState: any;
@@ -13,7 +14,7 @@ interface ProductionOSProps {
 }
 
 export default function ProductionOS({ dbState, onRefresh, onNotify, userRole }: ProductionOSProps) {
-  const [activeSubTab, setActiveSubTab] = useState<'boms' | 'mo' | 'procure' | 'qc' | 'inventory'>('mo');
+  const [activeSubTab, setActiveSubTab] = useState<'boms' | 'mo' | 'procure' | 'qc' | 'inventory' | 'bpr-gmp'>('bpr-gmp');
   
   // States for forms
   const [newMO, setNewMO] = useState({ productId: '', formulaId: '', qtyRequested: 100 });
@@ -180,6 +181,13 @@ export default function ProductionOS({ dbState, onRefresh, onNotify, userRole }:
       <div className="flex bg-[#E8E8ED] p-1 rounded-xl border border-[#D1D1D6] overflow-x-auto gap-0.5 select-none">
         <button
           type="button"
+          onClick={() => setActiveSubTab('bpr-gmp')}
+          className={`flex-1 py-1.5 px-3 rounded-lg font-medium text-xs transition-all whitespace-nowrap ${activeSubTab === 'bpr-gmp' ? 'bg-white text-[#1D1D1F] shadow-sm font-semibold' : 'text-[#86868B] hover:text-[#1D1D1F]'}`}
+        >
+          สมาร์ทบันทึกผสมสาร (BPR) &amp; ฉลากชั่งสติกเกอร์
+        </button>
+        <button
+          type="button"
           onClick={() => setActiveSubTab('mo')}
           className={`flex-1 py-1.5 px-3 rounded-lg font-medium text-xs transition-all whitespace-nowrap ${activeSubTab === 'mo' ? 'bg-white text-[#1D1D1F] shadow-sm font-semibold' : 'text-[#86868B] hover:text-[#1D1D1F]'}`}
         >
@@ -218,6 +226,16 @@ export default function ProductionOS({ dbState, onRefresh, onNotify, userRole }:
       {/* Main Section viewports */}
       <div className="min-h-[400px]">
 
+        {/* 0. BPR SHEET & INDUSTRIAL LOG SCREEN */}
+        {activeSubTab === 'bpr-gmp' && (
+          <BPRDocumentOS
+            dbState={dbState}
+            onRefresh={onRefresh}
+            onNotify={onNotify}
+            userRole={userRole}
+          />
+        )}
+
         {/* 1. MO & DISPATCH SCREEN */}
         {activeSubTab === 'mo' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -249,7 +267,7 @@ export default function ProductionOS({ dbState, onRefresh, onNotify, userRole }:
                       required
                     >
                       <option value="">-- เลือกสูตรกลิ่นน้ำหอม --</option>
-                      {dbState.products.map((p: any) => (
+                      {(dbState.products || []).map((p: any) => (
                         <option key={p.id} value={p.id}>{p.sku} | {p.name}</option>
                       ))}
                     </select>
@@ -264,7 +282,7 @@ export default function ProductionOS({ dbState, onRefresh, onNotify, userRole }:
                       required
                     >
                       <option value="">-- ตรวจสอบเทียบเคียงกับผลิตภัณฑ์อัตโนมัติ --</option>
-                      {dbState.formulas.map((f: any) => (
+                      {(dbState.formulas || []).map((f: any) => (
                         <option key={f.id} value={f.id}>สูตรบ่มรหัส {f.id} ({f.version})</option>
                       ))}
                     </select>
@@ -296,12 +314,12 @@ export default function ProductionOS({ dbState, onRefresh, onNotify, userRole }:
             <div className="lg:col-span-2 space-y-4">
               <div className="flex justify-between items-center bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
                 <h3 className="font-semibold text-slate-800 text-sm">สมุดรายวันควบคุมผลิตและขั้นตอนผสมน้ำหอมสะสม</h3>
-                <span className="text-xs bg-slate-100 px-3 py-1 rounded-full text-slate-700 font-medium">รวม {dbState.manufacturingOrders.length} รายการใบสั่ง</span>
+                <span className="text-xs bg-slate-100 px-3 py-1 rounded-full text-slate-700 font-medium">รวม {(dbState.manufacturingOrders || []).length} รายการใบสั่ง</span>
               </div>
 
               <div className="space-y-4">
-                {dbState.manufacturingOrders.map((mo: any) => {
-                  const product = dbState.products.find((p: any) => p.id === mo.productId);
+                {(dbState.manufacturingOrders || []).map((mo: any) => {
+                  const product = (dbState.products || []).find((p: any) => p.id === mo.productId);
                   const nextStatus = getWorkflowProgression(mo.status);
 
                   return (

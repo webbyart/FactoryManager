@@ -18,6 +18,8 @@ export interface Employee {
   allowance: number;
   joiningDate: string;
   skills: string[];
+  lineUserId?: string;
+  citizenId?: string;
 }
 
 export interface Department {
@@ -222,6 +224,8 @@ export interface AttendanceRecord {
     lng: number;
   };
   status: 'Present' | 'Late' | 'Absent';
+  photo?: string | null;
+  photoOut?: string | null;
 }
 
 export interface LeaveRequest {

@@ -560,13 +560,20 @@ export default function DashboardQuickTable({ dbState, onRefresh, onNotify }: Da
                             value={editForm.section || ''} 
                             onChange={(e) => handleEditChange('section', e.target.value)}
                           >
-                            <option value="Chemical Synthesis A">Chemical Synthesis A</option>
-                            <option value="Mixing & Grinding">Mixing & Grinding</option>
-                            <option value="Thermal Processing">Thermal Processing</option>
-                            <option value="Final Packaging">Final Packaging</option>
+                            <option value="Chemical Synthesis A">แผนกสังเคราะห์วิจัยเคมี A</option>
+                            <option value="Mixing & Grinding">แผนกบดผสมมวลสาร</option>
+                            <option value="Thermal Processing">กระบวนการควบคุมอุณหภูมิความร้อน</option>
+                            <option value="Final Packaging">สายงานบรรจุภัณฑ์และฝาพ่น</option>
+                            <option value="Raw Materials Depot">คลังวัตถุดิบต้นน้ำ</option>
                           </select>
                         ) : (
-                          <span>{mch.section}</span>
+                          <span>
+                            {mch.section === 'Chemical Synthesis A' ? 'แผนกสังเคราะห์วิจัยเคมี A' :
+                             mch.section === 'Mixing & Grinding' ? 'แผนกบดผสมมวลสาร' :
+                             mch.section === 'Thermal Processing' ? 'กระบวนการควบคุมอุณหภูมิความร้อน' :
+                             mch.section === 'Final Packaging' ? 'สายงานบรรจุภัณฑ์และฝาพ่น' : 
+                             mch.section === 'Raw Materials Depot' ? 'คลังวัตถุดิบต้นน้ำ' : mch.section}
+                          </span>
                         )}
                       </td>
 
@@ -580,7 +587,7 @@ export default function DashboardQuickTable({ dbState, onRefresh, onNotify }: Da
                             onChange={(e) => handleEditChange('mtbfHours', Number(e.target.value))} 
                           />
                         ) : (
-                          <span>{mch.mtbfHours} hr</span>
+                          <span>{mch.mtbfHours} ชม.</span>
                         )}
                       </td>
 
@@ -595,7 +602,7 @@ export default function DashboardQuickTable({ dbState, onRefresh, onNotify }: Da
                             onChange={(e) => handleEditChange('mttrHours', Number(e.target.value))} 
                           />
                         ) : (
-                          <span>{mch.mttrHours} hr</span>
+                          <span>{mch.mttrHours} ชม.</span>
                         )}
                       </td>
 
@@ -621,10 +628,10 @@ export default function DashboardQuickTable({ dbState, onRefresh, onNotify }: Da
                             value={editForm.status || ''} 
                             onChange={(e) => handleEditChange('status', e.target.value)}
                           >
-                            <option value="Online">Online</option>
-                            <option value="Offline">Offline</option>
-                            <option value="Repairing">Repairing</option>
-                            <option value="Maintenance">Maintenance</option>
+                            <option value="Online">ใช้งานปกติ (Online)</option>
+                            <option value="Offline">ปิดทำงานชั่วคราว (Offline)</option>
+                            <option value="Repairing">กำลังซ่อมปรับปรุง (Repairing)</option>
+                            <option value="Maintenance">บำรุงตามรอบ (Maintenance)</option>
                           </select>
                         ) : (
                           <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
@@ -639,7 +646,10 @@ export default function DashboardQuickTable({ dbState, onRefresh, onNotify }: Da
                               mch.status === 'Repairing' ? 'bg-[#FF9500]' :
                               'bg-[#5856D6]'
                             }`}></span>
-                            {mch.status}
+                            {mch.status === 'Online' ? 'ใช้งานปกติ (Online)' :
+                             mch.status === 'Offline' ? 'ปิดระบบชั่วคราว (Offline)' :
+                             mch.status === 'Repairing' ? 'กำลังปรับปรุง (Repairing)' :
+                             mch.status === 'Maintenance' ? 'ซ่อมบำรุงตามรอบ (Maintenance)' : mch.status}
                           </span>
                         )}
                       </td>

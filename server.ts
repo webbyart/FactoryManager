@@ -672,7 +672,7 @@ app.post("/api/maintenance/pm/complete", (req, res) => {
 // --- MODULE 3: HR & PAYROLL SYSTEM ---
 
 app.post("/api/hr/attendance/clock", (req, res) => {
-  const { employeeId, checkType, gpsCoords } = req.body;
+  const { employeeId, checkType, gpsCoords, photo } = req.body;
   const emp = dbState.employees.find(e => e.id === employeeId);
   if (!emp) {
     return res.status(404).json({ error: "Employee record not found" });
@@ -694,7 +694,8 @@ app.post("/api/hr/attendance/clock", (req, res) => {
       date: todayStr,
       checkIn: timeStr,
       gpsCoords: gpsCoords || { lat: 13.7563, lng: 100.5018 },
-      status: isLate ? 'Late' : 'Present'
+      status: isLate ? 'Late' : 'Present',
+      photo: photo || null
     };
     dbState.attendance.push(record);
     createEventLog(`[ATTENDANCE] Employee ${emp.name} clocked-in at ${timeStr}. Verified GPS lock. Status: ${record.status}`, 'HR', 'info');
@@ -703,6 +704,9 @@ app.post("/api/hr/attendance/clock", (req, res) => {
       return res.status(400).json({ error: "You must clock-in before checking out." });
     }
     record.checkOut = timeStr;
+    if (photo) {
+      record.photoOut = photo;
+    }
     createEventLog(`[ATTENDANCE] Employee ${emp.name} checked-out at ${timeStr}. Verified work shift completion.`, 'HR', 'info');
   }
 
@@ -769,6 +773,62 @@ app.post("/api/hr/payroll/post", (req, res) => {
   createEventLog(`[PAYROLL POSTED TO GL] Payroll Period ${period.periodName} completed and locked. General ledger posted with a Debit transaction card of $${totalPaySummaries.toLocaleString()} under company payroll accounts. payslips sent automatically.`, 'Accounting', 'info');
 
   res.json({ success: true, period });
+});
+
+// Send E-Payslip Flex Message to LINE Bot Messaging Webhook
+app.post("/api/hr/line-push", async (req, res) => {
+  const { userId, flexPayload, customToken } = req.body;
+  if (!userId || !flexPayload) {
+    return res.status(400).json({ error: "Missing LINE userId or Flex Message JSON payload." });
+  }
+
+  const tokenToUse = customToken || process.env.LINE_CHANNEL_ACCESS_TOKEN;
+  
+  if (!tokenToUse) {
+    // If no access token is configured, run in advanced simulation mode
+    createEventLog(`[LINE SIMULATION] Constructed beautiful LINE Flex Payslip digital envelope for User ID: ${userId}. Recorded successfully in the Audit Registry.`, "HR", "info");
+    return res.json({ 
+      success: true, 
+      message: "Simulation mode: SMS & LINE notification validated. Flex Payload was successfully compiled and processed.",
+      mode: "simulation" 
+    });
+  }
+
+  try {
+    const lineResponse = await fetch("https://api.line.me/v2/bot/message/push", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${tokenToUse}`
+      },
+      body: JSON.stringify({
+        to: userId,
+        messages: [
+          {
+            type: "flex",
+            altText: "ใบแจ้งยอดเงินประจำเดือน (E-Payslip)",
+            contents: flexPayload
+          }
+        ]
+      })
+    });
+
+    if (lineResponse.ok) {
+      createEventLog(`[LINE MSG DIRECT] Successfully dispatched payroll digital slip directly to LINE userId: ${userId}`, "HR", "info");
+      return res.json({ success: true, message: "Real integration delivery: Dispatched directly to LINE API successfully!", mode: "live" });
+    } else {
+      const errorText = await lineResponse.text();
+      console.error("LINE Messaging API responded with status error: ", errorText);
+      return res.status(lineResponse.status).json({ 
+        success: false, 
+        error: `LINE API Error: ${errorText}`,
+        message: "Real LINE dispatch failed. Please inspect Channel permissions or Token expiration." 
+      });
+    }
+  } catch (error: any) {
+    console.error("Failed to connect with LINE API REST endpoint: ", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
 });
 
 

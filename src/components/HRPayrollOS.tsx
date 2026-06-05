@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { 
   Users, Calendar, Clock, DollarSign, Award, MapPin, Check, 
-  X, Printer, FileText, ChevronRight, UserCheck, Play 
+  X, Printer, FileText, ChevronRight, UserCheck, Play, Send,
+  Camera, Upload
 } from 'lucide-react';
 import GoogleSheetEditor from './GoogleSheetEditor';
+import LinePayslipOS from './LinePayslipOS';
 
 interface HRPayrollOSProps {
   dbState: any;
@@ -13,16 +15,48 @@ interface HRPayrollOSProps {
 }
 
 export default function HRPayrollOS({ dbState, onRefresh, onNotify, userRole }: HRPayrollOSProps) {
-  const [activeHrTab, setActiveHrTab] = useState<'roster' | 'clock' | 'requests' | 'payroll'>('roster');
+  const [activeHrTab, setActiveHrTab] = useState<'roster' | 'clock' | 'requests' | 'payroll' | 'line-payslips'>('roster');
   
   // Simulated Selected Slip for Print
   const [printingSlip, setPrintingSlip] = useState<any>(null);
 
+  // States for Shift Clock terminal with custom inputs & camera
+  const [simulatedEmployeeId, setSimulatedEmployeeId] = useState<string>('emp-103'); 
+  const [clockLat, setClockLat] = useState<number>(13.7563);
+  const [clockLng, setClockLng] = useState<number>(100.5018);
+  const [clockPhoto, setClockPhoto] = useState<string>(''); 
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setClockPhoto(reader.result as string);
+        onNotify("อัปโหลดและสแกนใบหน้าจับคู่อัตราจ้างสำเร็จ", "info");
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleSimulatePhoto = () => {
+    const mockPhotos = [
+      'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&auto=format&fit=crop&q=80',
+      'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'
+    ];
+    const randomPhoto = mockPhotos[Math.floor(Math.random() * mockPhotos.length)];
+    setClockPhoto(randomPhoto);
+    onNotify("ถ่ายเซฟฟี่จำลองด้วยกล้องเสมือนจริงเรียบร้อย", "info");
+  }; 
+
   const handleClockAction = async (type: 'Check In' | 'Check Out') => {
-    // Simulated Lat/Lng
-    const randomCoords = {
-      lat: 13.7563 + (Math.random() - 0.5) * 0.01,
-      lng: 100.5018 + (Math.random() - 0.5) * 0.01
+    const coords = {
+      lat: clockLat,
+      lng: clockLng
     };
 
     try {
@@ -30,14 +64,17 @@ export default function HRPayrollOS({ dbState, onRefresh, onNotify, userRole }: 
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          employeeId: 'emp-103', // Simulate as Marcus Brody
+          employeeId: simulatedEmployeeId,
           checkType: type,
-          gpsCoords: randomCoords
+          gpsCoords: coords,
+          photo: clockPhoto || null
         })
       });
       const data = await res.json();
       if(data.success) {
-        onNotify(`Attendance successfully registered: ${type}. Lat: ${randomCoords.lat.toFixed(4)}, Lng: ${randomCoords.lng.toFixed(4)}`, "info");
+        const empName = dbState.employees?.find((e: any) => e.id === simulatedEmployeeId)?.name || (simulatedEmployeeId === 'emp-103' ? 'Marcus Brody' : simulatedEmployeeId);
+        onNotify(`บันทึกเวลาสำเร็จ: ${type} ของ ${empName}. พิกัด Lat: ${coords.lat.toFixed(4)}, Lng: ${coords.lng.toFixed(4)}`, "info");
+        setClockPhoto(''); // reset photo state after clock action
         onRefresh();
       } else {
         onNotify(data.error, "error");
@@ -113,6 +150,13 @@ export default function HRPayrollOS({ dbState, onRefresh, onNotify, userRole }: 
           className={`flex-1 py-1.5 px-3 rounded-lg font-medium text-xs transition-all whitespace-nowrap ${activeHrTab === 'payroll' ? 'bg-white text-[#1D1D1F] shadow-sm font-semibold' : 'text-[#86868B] hover:text-[#1D1D1F]'}`}
         >
           สลิปและเงินเดือนพนักงาน (Payroll Specs)
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveHrTab('line-payslips')}
+          className={`flex-1 py-1.5 px-3 rounded-lg font-medium text-xs transition-all whitespace-nowrap ${activeHrTab === 'line-payslips' ? 'bg-white text-[#1D1D1F] shadow-sm font-semibold' : 'text-[#86868B] hover:text-[#1D1D1F]'}`}
+        >
+          ส่งสลิปไลน์ Flex Message (E-Payslip)
         </button>
       </div>
 
@@ -214,83 +258,225 @@ export default function HRPayrollOS({ dbState, onRefresh, onNotify, userRole }: 
         )}
 
         {/* Tab 2: Clock terminal GPS */}
-        {activeHrTab === 'clock' && (
-          <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Simulator Card block */}
-              <div className="lg:col-span-1 bg-slate-900 rounded-2xl p-6 text-white space-y-4">
-                <div className="flex items-center gap-2 text-emerald-400">
-                  <MapPin className="h-5 w-5" />
-                  <span className="text-xs font-mono font-bold animate-pulse">GPS POSITION SATLOCK - OK</span>
-                </div>
-                <div>
-                  <h4 className="font-extrabold text-lg">Shift Clock terminal</h4>
-                  <p className="text-slate-400 text-xs">Simulating as employee: <strong>Marcus Brody</strong> (CNC Operator)</p>
-                </div>
+        {activeHrTab === 'clock' && (() => {
+          const isInsidePlant = Math.abs(clockLat - 13.7563) < 0.005 && Math.abs(clockLng - 100.5018) < 0.005;
+          return (
+            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Simulator Card block */}
+                <div className="lg:col-span-1 bg-slate-900 rounded-2xl p-6 text-white space-y-4 shadow-xl">
+                  <div className="flex items-center gap-2 text-emerald-400">
+                    <MapPin className="h-5 w-5" />
+                    <span className="text-xs font-mono font-bold animate-pulse">GPS POSITION SATLOCK - OK</span>
+                  </div>
+                  <div>
+                    <h4 className="font-extrabold text-lg">Shift Clock terminal</h4>
+                    <p className="text-slate-400 text-xs">Simulating as employee: <strong>{dbState.employees?.find((e: any) => e.id === simulatedEmployeeId)?.name || "Marcus Brody"}</strong></p>
+                  </div>
 
-                <div className="p-4 bg-slate-800 rounded-xl space-y-2 text-xs font-mono border border-slate-700 text-slate-300">
-                  <p>Target Latitude: <span className="text-emerald-400">13.7563° N</span></p>
-                  <p>Target Longitude: <span className="text-emerald-400">100.5018° E</span></p>
-                  <p>Geofence Lock: <span className="bg-emerald-950 text-emerald-400 px-1 py-0.5 rounded text-[9px] font-bold">VERIFIED INSIDE PLANT</span></p>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => handleClockAction('Check In')}
-                    className="py-2.5 bg-emerald-600 hover:bg-emerald-700 rounded-xl font-bold text-xs shadow-sm transition-colors"
-                  >
-                    Check In Shift
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleClockAction('Check Out')}
-                    className="py-2.5 bg-rose-600 hover:bg-rose-700 rounded-xl font-bold text-xs shadow-sm transition-colors"
-                  >
-                    Check Out Shift
-                  </button>
-                </div>
-              </div>
-
-              {/* Attendance Log Table */}
-              <div className="lg:col-span-2 space-y-3">
-                <h3 className="font-semibold text-slate-800 text-sm">Attendance logs (GPS geofenced logs)</h3>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs text-left text-slate-600">
-                    <thead>
-                      <tr className="border-b border-slate-100 font-mono text-slate-400 text-left uppercase text-[9px]">
-                        <th className="pb-2">Date Record</th>
-                        <th className="pb-2">Employee ID</th>
-                        <th className="pb-2">Check In</th>
-                        <th className="pb-2">Check Out</th>
-                        <th className="pb-2">GPS Verification</th>
-                        <th className="pb-2 text-right">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {dbState.attendance.map((log: any) => (
-                        <tr key={log.id} className="border-b border-slate-100 font-mono">
-                          <td className="py-2.5 text-slate-800 font-semibold">{log.date}</td>
-                          <td className="py-2.5 text-slate-500 font-bold">{log.employeeId}</td>
-                          <td className="py-2.5 font-bold text-emerald-600">{log.checkIn}</td>
-                          <td className="py-2.5 text-slate-600">{log.checkOut || '--'}</td>
-                          <td className="py-2.5 text-[10px] text-slate-500">
-                            {log.gpsCoords ? `${log.gpsCoords.lat.toFixed(4)}, ${log.gpsCoords.lng.toFixed(4)}` : 'N/A Geofence'}
-                          </td>
-                          <td className="py-2.5 text-right">
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                              log.status === 'Present' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-100 text-amber-700 font-bold'
-                            }`}>{log.status}</span>
-                          </td>
-                        </tr>
+                  {/* Simulate Employee Selector Dropdown */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] uppercase tracking-wider text-slate-400 font-bold block">Simulating employee user</label>
+                    <select
+                      value={simulatedEmployeeId}
+                      onChange={(e) => setSimulatedEmployeeId(e.target.value)}
+                      className="w-full bg-slate-800 text-white rounded-xl py-2 px-3 text-xs border border-slate-700 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                    >
+                      {dbState.employees?.map((emp: any) => (
+                        <option key={emp.id} value={emp.id}>
+                          {emp.id === 'emp-103' ? 'Marcus Brody (CNC Operator)' : `${emp.name} (${emp.id})`}
+                        </option>
                       ))}
-                    </tbody>
-                  </table>
+                    </select>
+                  </div>
+
+                  {/* Coordinates & Custom Geofence Input Fields */}
+                  <div className="bg-slate-800 p-4 rounded-xl space-y-3 text-xs font-mono border border-slate-700 text-slate-300">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[9px] text-slate-400 block font-sans">Target Latitude</label>
+                        <input 
+                          type="number" 
+                          step="0.0001" 
+                          value={clockLat} 
+                          onChange={(e) => setClockLat(parseFloat(e.target.value) || 0)}
+                          className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-emerald-400 font-mono"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[9px] text-slate-400 block font-sans">Target Longitude</label>
+                        <input 
+                          type="number" 
+                          step="0.0001" 
+                          value={clockLng} 
+                          onChange={(e) => setClockLng(parseFloat(e.target.value) || 0)}
+                          className="w-full bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-emerald-400 font-mono"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex justify-between items-center bg-slate-900/50 p-2 rounded border border-slate-700">
+                      <span className="text-[10px] text-slate-400 font-sans">Geofence Lock:</span>
+                      {isInsidePlant ? (
+                        <span className="bg-emerald-950 text-emerald-400 px-1.5 py-0.5 rounded text-[9px] font-bold">VERIFIED INSIDE PLANT</span>
+                      ) : (
+                        <span className="bg-rose-950 text-rose-400 px-1.5 py-0.5 rounded text-[9px] font-bold">OUTSIDE PLANT - LOCKED</span>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setClockLat(13.7563);
+                        setClockLng(100.5018);
+                        onNotify("รีเซ็ตพิกัดโรงงานหลัก 13.7563° N, 100.5018° E เรียบร้อย", "info");
+                      }}
+                      className="w-full border border-dashed border-slate-600 hover:border-slate-400 py-1 rounded text-[9px] text-slate-400 hover:text-slate-200 transition-colors"
+                    >
+                      กลับพิกัดโรงงาน (13.7563°, 100.5018°)
+                    </button>
+                  </div>
+
+                  {/* "สามารถ ถ่ายรูปได้ด้วย" - Photo Selection/Capture Card */}
+                  <div className="p-4 bg-slate-800 rounded-xl space-y-3 border border-slate-700">
+                    <div className="flex justify-between items-center">
+                      <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">ยืนยันภาพถ่าย (Selfie Verification)</span>
+                      {clockPhoto && (
+                        <button
+                          type="button"
+                          onClick={() => setClockPhoto('')}
+                          className="text-rose-400 hover:text-rose-300 text-[10px] underline"
+                        >
+                          ลบภาพ
+                        </button>
+                      )}
+                    </div>
+                    
+                    {clockPhoto ? (
+                      <div className="relative flex flex-col items-center justify-center p-3 bg-slate-950 rounded-lg border border-slate-700 overflow-hidden group">
+                        <img 
+                          src={clockPhoto} 
+                          alt="Employee Selfie Preview" 
+                          referrerPolicy="no-referrer"
+                          className="w-24 h-24 rounded-full object-cover border-2 border-emerald-500 shadow-md transition-transform duration-300 group-hover:scale-105"
+                        />
+                        <div className="mt-2 text-center">
+                          <span className="inline-block bg-emerald-950 text-emerald-400 border border-emerald-800 px-2 py-0.5 rounded-full text-[9px] font-mono font-bold animate-pulse">
+                            FACIAL PROFILE MATCHED - 99.8%
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center py-6 px-4 bg-slate-950 rounded-lg border border-dashed border-slate-700 text-center">
+                        <Camera className="h-8 w-8 text-slate-500 mb-2" />
+                        <p className="text-[11px] text-slate-400">ยังไม่ได้ถ่ายภาพถ่ายยันพนักงาน</p>
+                        <p className="text-[9px] text-slate-500 mt-1">กรุณากดเปิดกล้องถ่ายหรือจำลองภาพเซลฟี่</p>
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-2 text-[10px] font-sans">
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="flex items-center justify-center gap-1.5 py-1.5 bg-slate-700 hover:bg-slate-600 rounded text-slate-200"
+                      >
+                        <Camera className="h-3 w-3" />
+                        เปิดกล้อง / เลือกรูป
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleSimulatePhoto}
+                        className="flex items-center justify-center gap-1.5 py-1.5 bg-slate-700 hover:bg-slate-600 rounded text-slate-200"
+                      >
+                        <Upload className="h-3 w-3" />
+                        ⚡ จำลองรูปเซลฟี่
+                      </button>
+                    </div>
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      capture="user"
+                      ref={fileInputRef}
+                      onChange={handleFileChange}
+                      className="hidden"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => handleClockAction('Check In')}
+                      className="py-2.5 bg-emerald-600 hover:bg-emerald-700 rounded-xl font-bold text-xs shadow-sm transition-colors text-center"
+                    >
+                      Check In Shift
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleClockAction('Check Out')}
+                      className="py-2.5 bg-rose-600 hover:bg-rose-700 rounded-xl font-bold text-xs shadow-sm transition-colors text-center"
+                    >
+                      Check Out Shift
+                    </button>
+                  </div>
+                </div>
+
+                {/* Attendance Log Table */}
+                <div className="lg:col-span-2 space-y-3">
+                  <h3 className="font-semibold text-slate-800 text-sm">Attendance logs (GPS geofenced logs)</h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs text-left text-slate-600">
+                      <thead>
+                        <tr className="border-b border-slate-100 font-mono text-slate-400 text-left uppercase text-[9px]">
+                          <th className="pb-2">Date Record</th>
+                          <th className="pb-2">Employee ID/Name</th>
+                          <th className="pb-1">Verification Picture</th>
+                          <th className="pb-2">Check In</th>
+                          <th className="pb-2">Check Out</th>
+                          <th className="pb-2">GPS Verification</th>
+                          <th className="pb-2 text-right">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {dbState.attendance.map((log: any) => {
+                          const empData = dbState.employees?.find((e: any) => e.id === log.employeeId);
+                          const empNameLabel = empData ? (log.employeeId === 'emp-103' ? 'Marcus Brody (CNC)' : empData.name) : log.employeeId;
+                          return (
+                            <tr key={log.id} className="border-b border-slate-100 font-mono">
+                              <td className="py-2.5 text-slate-800 font-semibold">{log.date}</td>
+                              <td className="py-2.5 text-slate-500 font-bold">
+                                {log.employeeId} - <span className="text-[10px] text-slate-700 font-sans">{empNameLabel}</span>
+                              </td>
+                              <td className="py-2 text-slate-500">
+                                {log.photo ? (
+                                  <img 
+                                    src={log.photo} 
+                                    alt="Verification selfie" 
+                                    referrerPolicy="no-referrer"
+                                    className="w-10 h-10 rounded-full object-cover border border-slate-300 shadow-xs"
+                                  />
+                                ) : (
+                                  <span className="text-[10px] text-slate-400 font-sans italic">No Image</span>
+                                )}
+                              </td>
+                              <td className="py-2.5 font-bold text-emerald-600">{log.checkIn}</td>
+                              <td className="py-2.5 text-slate-600">{log.checkOut || '--'}</td>
+                              <td className="py-2.5 text-[10px] text-slate-500">
+                                {log.gpsCoords ? `${log.gpsCoords.lat.toFixed(4)}, ${log.gpsCoords.lng.toFixed(4)}` : 'N/A Geofence'}
+                              </td>
+                              <td className="py-2.5 text-right">
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                  log.status === 'Present' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-100 text-amber-700 font-bold'
+                                }`}>{log.status}</span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* Tab 3: Leaves & OT requests */}
         {activeHrTab === 'requests' && (
@@ -497,6 +683,16 @@ export default function HRPayrollOS({ dbState, onRefresh, onNotify, userRole }: 
               </div>
             </div>
           </div>
+        )}
+
+        {/* Tab 5: LINE Flex Message Creator and sender */}
+        {activeHrTab === 'line-payslips' && (
+          <LinePayslipOS
+            dbState={dbState}
+            onRefresh={onRefresh}
+            onNotify={onNotify}
+            userRole={userRole}
+          />
         )}
 
       </div>
