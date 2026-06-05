@@ -754,11 +754,14 @@ export default function DashboardQuickTable({ dbState, onRefresh, onNotify }: Da
                             value={editForm.category || ''} 
                             onChange={(e) => handleEditChange('category', e.target.value)}
                           >
-                            <option value="Raw Material">Raw Material</option>
-                            <option value="Packaging">Packaging</option>
+                            <option value="Raw Material">สารสกัดวัตถุดิบหอม (Raw Material)</option>
+                            <option value="Packaging">ขวดแก้ว/ฝาพ่นพรีเมียม (Packaging)</option>
                           </select>
                         ) : (
-                          <span>{mat.category}</span>
+                          <span>
+                            {mat.category === 'Raw Material' ? 'สารสกัดวัตถุดิบหอม (Raw Material)' : 
+                             mat.category === 'Packaging' ? 'ขวดแก้ว/ฝาพ่นพรีเมียม (Packaging)' : mat.category}
+                          </span>
                         )}
                       </td>
 

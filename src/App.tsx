@@ -17,9 +17,82 @@ import AccountingOS from './components/AccountingOS';
 import DeveloperOS from './components/DeveloperOS';
 import DashboardQuickTable from './components/DashboardQuickTable';
 
+import { 
+  DEPARTMENTS, ROLES, EMPLOYEES, CUSTOMERS, SUPPLIERS, PRODUCTS, MATERIALS, 
+  FORMULAS, MACHINES, MANUFACTURING_ORDERS, REPAIR_TICKETS, PM_TASKS, SPARE_PARTS, 
+  ATTENDANCE, LEAVE_REQUESTS, OT_REQUESTS, PAYROLL_PERIODS, PAYSLIPS, TRANSACTIONS, 
+  INVOICES, SUPPLIER_BILLS, AUDIT_LOGS, GOODS_RECEIPTS, PURCHASE_ORDERS, 
+  PURCHASE_REQUESTS, QC_INSPECTIONS
+} from './data/mockFactoryData';
+
+const INITIAL_DB_STATE = {
+  departments: DEPARTMENTS,
+  roles: ROLES,
+  employees: EMPLOYEES,
+  customers: CUSTOMERS,
+  suppliers: SUPPLIERS,
+  products: PRODUCTS,
+  materials: MATERIALS,
+  formulas: FORMULAS,
+  machines: MACHINES,
+  manufacturingOrders: MANUFACTURING_ORDERS,
+  purchaseRequests: PURCHASE_REQUESTS,
+  purchaseOrders: PURCHASE_ORDERS,
+  goodsReceipts: GOODS_RECEIPTS,
+  qcInspections: QC_INSPECTIONS,
+  repairTickets: REPAIR_TICKETS,
+  pmTasks: PM_TASKS,
+  spareParts: SPARE_PARTS,
+  attendance: ATTENDANCE,
+  leaveRequests: LEAVE_REQUESTS,
+  otRequests: OT_REQUESTS,
+  payrollPeriods: PAYROLL_PERIODS,
+  payslips: PAYSLIPS,
+  transactions: TRANSACTIONS,
+  invoices: INVOICES,
+  supplierBills: SUPPLIER_BILLS,
+  bills: SUPPLIER_BILLS,
+  coa: [
+    { code: '1010', name: 'Cash on Hand / Industrial Treasury', type: 'Asset', balance: 450000, id: 'coa-1010' },
+    { code: '1020', name: 'Raw Material Inventory Capitalized', type: 'Asset', balance: 185000, id: 'coa-1020' },
+    { code: '1030', name: 'Accounts Receivable (A/R Ledger)', type: 'Asset', balance: 163000, id: 'coa-1030' },
+    { code: '2010', name: 'Accounts Payable Accrued (A/P)', type: 'Liability', balance: 15800, id: 'coa-2010' },
+    { code: '3010', name: 'Corporate Retained Earnings Capital', type: 'Equity', balance: 350000, id: 'coa-3010' },
+    { code: '4010', name: 'Wholesale Factory Product Sales Revenue', type: 'Revenue', balance: 512500, id: 'coa-4010' },
+    { code: '5010', name: 'Direct Plant Wages & Labor Expenses', type: 'Expense', balance: 150700, id: 'coa-5010' },
+    { code: '5020', name: 'Machinery Overhaul & Corrective PM OPEX', type: 'Expense', balance: 14200, id: 'coa-5020' },
+    { code: '5030', name: 'Direct Raw Material Procurement OPEX', type: 'Expense', balance: 60500, id: 'coa-5030' }
+  ],
+  journals: [
+    {
+      id: 'jn-001',
+      memo: 'Raw material inventory asset adjustment',
+      date: '2026-05-01',
+      lines: [
+        { accountCode: '1020', type: 'Debit', amount: 185000 },
+        { accountCode: '3010', type: 'Credit', amount: 185000 }
+      ]
+    },
+    {
+      id: 'jn-002',
+      memo: 'May 2026 plant wages ledger allocation',
+      date: '2026-05-28',
+      lines: [
+        { accountCode: '5010', type: 'Debit', amount: 150700 },
+        { accountCode: '1010', type: 'Credit', amount: 150700 }
+      ]
+    }
+  ],
+  auditLogs: AUDIT_LOGS,
+  notifications: [
+    { id: 'n-1', message: 'Welcome to IDEVA Factory OS - System Boot Completed', severity: 'info', createdAt: new Date().toISOString() },
+    { id: 'n-2', message: 'Alert: Spare Part SP-VLV-PV90 is below core minStock. Manual or auto PR check triggered.', severity: 'warning', createdAt: new Date().toISOString() }
+  ]
+};
+
 export default function App() {
-  const [dbState, setDbState] = useState<any>(null);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [dbState, setDbState] = useState<any>(INITIAL_DB_STATE);
+  const [loading, setLoading] = useState<boolean>(false);
   const [userRole, setUserRole] = useState<string>('Admin'); // Interactive RBAC
   const [activeTab, setActiveTab] = useState<'dashboard' | 'production' | 'maintenance' | 'hr' | 'accounting' | 'developer' | 'copilot'>('dashboard');
   
@@ -145,14 +218,14 @@ export default function App() {
             <Building className="h-5 w-5" />
           </div>
           <div>
-            <h1 className="font-semibold text-xs tracking-wider font-sans text-[#1D1D1F]">IDEVA FACTORY SYSTEM</h1>
-            <p className="text-[9px] text-[#86868B] font-bold uppercase tracking-widest mt-0.5">ระบบควบคุมโรงงานอุตสาหกรรม</p>
+            <h1 className="font-semibold text-xs tracking-wider font-sans text-[#1D1D1F]">ระบบผลิตน้ำหอมอัจฉริยะ</h1>
+            <p className="text-[9px] text-[#86868B] font-bold uppercase tracking-widest mt-0.5">โรงงานปรุงผสมน้ำหอมระดับวิสาหกิจ</p>
           </div>
         </div>
 
         {/* Navigation list */}
         <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
-          <p className="px-3 text-[10px] font-semibold text-[#86868B] uppercase tracking-widest mb-3">โมดูลปฏิบัติการ (Operations)</p>
+          <p className="px-3 text-[10px] font-semibold text-[#86868B] uppercase tracking-widest mb-3">แผงควบคุมหลัก</p>
           
           <button
             type="button"
@@ -165,7 +238,7 @@ export default function App() {
           >
             <span className="flex items-center gap-2.5">
               <Layers className={`h-4 w-4 ${activeTab === 'dashboard' ? 'text-white' : 'text-[#86868B]'}`} /> 
-              แผงวิเคราะห์ผู้บริหาร (Dashboard)
+              แผงวิเคราะห์และควบคุม OEE
             </span>
             <ChevronRight className={`h-3 w-3 transition-transform ${activeTab === 'dashboard' ? 'translate-x-0.5 text-white' : 'text-slate-400'}`} />
           </button>
@@ -181,7 +254,7 @@ export default function App() {
           >
             <span className="flex items-center gap-2.5">
               <Cpu className={`h-4 w-4 ${activeTab === 'production' ? 'text-white' : 'text-[#86868B]'}`} /> 
-              ระบบการผลิตเคมีภัณฑ์ (Production)
+              ระบบการกลั่นปรุงและผสมสารน้ำหอม
             </span>
             <ChevronRight className={`h-3 w-3 transition-transform ${activeTab === 'production' ? 'translate-x-0.5 text-white' : 'text-slate-400'}`} />
           </button>
@@ -197,7 +270,7 @@ export default function App() {
           >
             <span className="flex items-center gap-2.5">
               <Wrench className={`h-4 w-4 ${activeTab === 'maintenance' ? 'text-white' : 'text-[#86868B]'}`} /> 
-              ระบบซ่อมบำรุงเครื่องจักร (Maintenance)
+              การซ่อมบำรุงท่อกลั่นและเครื่องจักร
             </span>
             <ChevronRight className={`h-3 w-3 transition-transform ${activeTab === 'maintenance' ? 'translate-x-0.5 text-white' : 'text-slate-400'}`} />
           </button>
@@ -213,7 +286,7 @@ export default function App() {
           >
             <span className="flex items-center gap-2.5">
               <Users className={`h-4 w-4 ${activeTab === 'hr' ? 'text-white' : 'text-[#86868B]'}`} /> 
-              ระบบบุคลากร &amp; เงินเดือน (HR Admin)
+              พนักงานและเงินเดือนผู้ดลกลั่น
             </span>
             <ChevronRight className={`h-3 w-3 transition-transform ${activeTab === 'hr' ? 'translate-x-0.5 text-white' : 'text-slate-400'}`} />
           </button>
@@ -229,12 +302,12 @@ export default function App() {
           >
             <span className="flex items-center gap-2.5">
               <DollarSign className={`h-4 w-4 ${activeTab === 'accounting' ? 'text-white' : 'text-[#86868B]'}`} /> 
-              ระบบบัญชีและการเงิน (Accounting)
+              บัญชีแยกประเภท คลังวัตถุดิบและจัดซื้อ
             </span>
             <ChevronRight className={`h-3 w-3 transition-transform ${activeTab === 'accounting' ? 'translate-x-0.5 text-white' : 'text-slate-400'}`} />
           </button>
 
-          <p className="px-3 pt-6 text-[10px] font-semibold text-[#86868B] uppercase tracking-widest mb-3">ระบบประมวลผล AI</p>
+          <p className="px-3 pt-6 text-[10px] font-semibold text-[#86868B] uppercase tracking-widest mb-3">ระบบคำนวณสูตรอัจฉริยะ</p>
 
           <button
             type="button"
@@ -247,12 +320,12 @@ export default function App() {
           >
             <span className="flex items-center gap-2.5">
               <BrainCircuit className={`h-4 w-4 ${activeTab === 'copilot' ? 'text-white' : 'text-[#86868B]'}`} /> 
-              ผู้ช่วยประธานตรวจการ (AI Copilot)
+              ผู้ช่วยปัญญาประดิษฐ์สเกลและปรับปรุงสูตร
             </span>
             <ChevronRight className={`h-3 w-3 transition-transform ${activeTab === 'copilot' ? 'translate-x-0.5 text-white' : 'text-slate-400'}`} />
           </button>
 
-          <p className="px-3 pt-6 text-[10px] font-semibold text-[#86868B] uppercase tracking-widest mb-3">เครื่องมือฐานข้อมูล</p>
+          <p className="px-3 pt-6 text-[10px] font-semibold text-[#86868B] uppercase tracking-widest mb-3">ฐานข้อมูลวิศวกร</p>
 
           <button
             type="button"
@@ -265,7 +338,7 @@ export default function App() {
           >
             <span className="flex items-center gap-2.5">
               <Terminal className={`h-4 w-4 ${activeTab === 'developer' ? 'text-[#1D1D1F]' : 'text-[#86868B]'}`} /> 
-              ผังดึงโครงสร้าง DB &amp; SQL Query
+              กระดานเช็คคำสั่ง SQL สำหรับโปรแกรมเมอร์
             </span>
             <ChevronRight className={`h-3 w-3 transition-transform ${activeTab === 'developer' ? 'translate-x-0.5 text-[#1D1D1F]' : 'text-slate-400'}`} />
           </button>
@@ -286,14 +359,14 @@ export default function App() {
             <span className="text-sm font-semibold text-[#1D1D1F] md:hidden">IDEVA OS</span>
             <div className="flex items-center gap-1.5 bg-neutral-50 border border-[#E5E5EA] text-[#1D1D1F] px-3 py-1 rounded-full text-xs font-medium">
               <span className="w-2 h-2 rounded-full bg-[#34C759] animate-pulse"></span>
-              <span>ระบบทำงานปกติ (System Normal)</span>
+              <span>ระบบดำเนินงานปกติแบบเรียลไทม์</span>
             </div>
           </div>
 
           <div className="flex items-center gap-3 shrink-0">
             {/* Interactive User Switcher RBAC simulated badge */}
             <div className="flex items-center gap-2.5 bg-neutral-50 p-1 rounded-xl border border-[#E5E5EA]">
-              <span className="hidden lg:inline text-[10px] text-[#86868B] font-bold uppercase pl-2">Testing Role:</span>
+              <span className="hidden lg:inline text-[10px] text-[#86868B] font-bold uppercase pl-2">สิทธิ์ทดลองใช้งาน:</span>
               <select
                 className="text-xs bg-white text-[#1D1D1F] font-semibold rounded-lg border border-[#E5E5EA] shadow-xs px-2 py-1 outline-none cursor-pointer focus:ring-1 focus:ring-[#0071E3]/20"
                 value={userRole}
@@ -404,8 +477,8 @@ export default function App() {
                       <p className="text-[#86868B] text-xs mt-0.5">การตรวจสอบยอดทางบัญชีสุทธิระหว่างบิลเจ้าหนี้และใบแจ้งตั๋วค้างชำระลูกค้า</p>
                     </div>
                   </div>
-                  <div className="h-64">
-                    <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+                  <div className="h-64 min-h-[256px] min-w-0" id="income-statement-chart-wrapper">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                       <AreaChart data={revenueExpenseChartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                         <defs>
                           <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
@@ -431,8 +504,8 @@ export default function App() {
                 {/* 2. active MO dispatch stage distribution */}
                 <div className="bg-white p-6 rounded-2xl border border-[#E5E5EA] shadow-sm space-y-4 lg:col-span-1">
                   <h4 className="font-semibold text-[#1D1D1F] text-sm">การกระจายตัวขั้นตอนสั่งผลิต (Manufacturing Dispatch Stages)</h4>
-                  <div className="h-60 flex items-center justify-center relative">
-                    <ResponsiveContainer width="100%" height="100%" minWidth={0}>
+                  <div className="h-60 min-h-[240px] min-w-0 flex items-center justify-center relative" id="manufacturing-dispatch-chart-wrapper">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
                       <PieChart>
                         <Pie
                           data={moStageChartData}
