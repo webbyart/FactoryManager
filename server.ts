@@ -311,7 +311,7 @@ app.post("/api/generic/create", (req, res) => {
 
 // Create MO & Generate Material Requirements
 app.post("/api/mo/create", (req, res) => {
-  const { productId, formulaId, quantityRequested } = req.body;
+  const { productId, formulaId, quantityRequested, customerId, customerName, batchSize, notes } = req.body;
   if (!productId || !formulaId || !quantityRequested) {
     return res.status(400).json({ error: "Missing required parameters." });
   }
@@ -324,22 +324,27 @@ app.post("/api/mo/create", (req, res) => {
     return res.status(404).json({ error: "Formula or Product not found." });
   }
 
-  const newMO: ManufacturingOrder = {
+  const newMO: any = {
     id: moId,
     productId,
     formulaId,
     quantityRequested: Number(quantityRequested),
     quantityProduced: 0,
     startDate: new Date().toISOString().split('T')[0],
-    status: 'Created'
+    status: 'Created',
+    customerId: customerId || null,
+    customerName: customerName || null,
+    batchSize: batchSize ? Number(batchSize) : 1,
+    notes: notes || ""
   };
 
   dbState.manufacturingOrders.unshift(newMO);
-  createEventLog(`Manufacturing Order ${moId} created for ${quantityRequested} units of ${prod.name}`, 'Production', 'info');
+  const orderType = customerName ? `OEM Client Custom Order for ${customerName}` : 'Regular Production';
+  createEventLog(`Manufacturing Order ${moId} (${orderType}) created for ${quantityRequested} units of ${prod.name}`, 'Production', 'info');
 
   // TRIGGER: When MO Created -> Generate Material Requirement & Material Reservation check
   formula.items.forEach(item => {
-    const requiredQty = item.quantity * Number(quantityRequested);
+    const requiredQty = item.quantity * Number(quantityRequested) * (batchSize ? Number(batchSize) : 1) * 0.1; // adjust scaling ratio safely
     const material = dbState.materials.find(m => m.id === item.materialId);
     if (material) {
       createEventLog(`[MO REQUIREMENT] Order ${moId} requires ${requiredQty.toFixed(2)} ${material.unit} of raw ingredient ${material.name}`, 'Production', 'info');

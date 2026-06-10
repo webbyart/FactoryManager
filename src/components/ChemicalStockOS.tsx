@@ -26,6 +26,9 @@ export default function ChemicalStockOS({ dbState, onRefresh, onNotify, userRole
   const [notes, setNotes] = useState('');
 
   const [loading, setLoading] = useState(false);
+  const [editingCell, setEditingCell] = useState<{ id: string; field: string } | null>(null);
+  const [tempValue, setTempValue] = useState<string>('');
+  const [gridMode, setGridMode] = useState<boolean>(true);
 
   // Filter materials that are chemicals / raw materials (or all materials based on user choice)
   const unfilteredMaterials = dbState.materials || [];
@@ -155,6 +158,101 @@ export default function ChemicalStockOS({ dbState, onRefresh, onNotify, userRole
       }
     } catch {
       onNotify("ไม่สามารถซิงค์การเบิกจ่ายกับเซิร์ฟเวอร์หลัก", "error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdateCell = async (id: string, field: string, value: string) => {
+    const material = unfilteredMaterials.find((m: any) => m.id === id);
+    if (!material) return;
+
+    let parsedValue: any = value.trim();
+    if (field === 'stockLevel' || field === 'minStock') {
+      parsedValue = Number(value);
+      if (isNaN(parsedValue)) {
+        onNotify("กรุณาระบุจำนวนที่เป็นตัวเลขเท่านั้น", "error");
+        return;
+      }
+    }
+
+    setLoading(true);
+    try {
+      const updatedMaterial = {
+        ...material,
+        [field]: parsedValue
+      };
+
+      const response = await fetch('/api/generic/update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ table: 'materials', item: updatedMaterial })
+      });
+      const data = await response.json();
+      if (data.success) {
+        onNotify(`✓ อัปเดตข้อมูล ${field} สำเร็จของรหัส ${material.code}!`, "info");
+        onRefresh();
+      } else {
+        onNotify("ผิดพลาดในการส่งถ่ายข้อมูลอัปเดต", "error");
+      }
+    } catch {
+      onNotify("เกิดข้อผิดพลาดทางเทคโนโลยีสัญญาณ", "error");
+    } finally {
+      setLoading(false);
+      setEditingCell(null);
+    }
+  };
+
+  const handleAutoReorderPoints = async () => {
+    const lowMaterials = unfilteredMaterials.filter((m: any) => m.stockLevel < m.minStock);
+    if (lowMaterials.length === 0) {
+      onNotify("✓ วัตถุดิบทุกรายการเสถียร มีระดับเพียงพอเหนือด่าน Min Stock ปลอดภัยเรียบร้อย", "info");
+      return;
+    }
+
+    const confirmMsg = `ตรวจพบคลังวัตถุดิบต่ำกว่าเกณฑ์ขั้นต่ำ ${lowMaterials.length} รายการ!\n\nระบบจะช่วยเติมสต็อกฉุกเฉินให้อัตโนมัติทันทีเพื่อให้ท่านสามารถสร้างสูตรน้ำหอมต่อในเครื่องคำนวณได้ทันที (Auto Restock 2x Min stock)\n\nกดตกลงเพื่อดำเนินการอัปเดตระเบียนคลังและจัดทำ PR หรือไม่?`;
+    if (!window.confirm(confirmMsg)) return;
+
+    setLoading(true);
+    try {
+      let restockedCount = 0;
+      for (const m of lowMaterials) {
+        const targetQty = Math.ceil(m.minStock * 2);
+        const updatedMaterial = {
+          ...m,
+          stockLevel: targetQty
+        };
+
+        await fetch('/api/generic/update', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ table: 'materials', item: updatedMaterial })
+        });
+
+        const newPR = {
+          id: `PR-${Date.now().toString().slice(-4)}-${Math.floor(Math.random()*100)}`,
+          materialId: m.id,
+          quantity: targetQty - m.stockLevel,
+          estimatedCost: (targetQty - m.stockLevel) * 280,
+          status: 'Direct Cleared',
+          urgency: 'Immediate',
+          requestedBy: 'MRP Auto-Reorder Engine',
+          createdAt: new Date().toISOString().split('T')[0]
+        };
+
+        await fetch('/api/generic/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ table: 'purchaseRequests', item: newPR })
+        });
+
+        restockedCount++;
+      }
+
+      onNotify(`✓ เติมสต็อกสารและระบบคำนวณ 'Stock Reorder Point' อัตโนมัติเรียบร้อย ${restockedCount} รายการ! คลังสินค้ากลับมาพร้อมสูตรแล้ว`, "info");
+      onRefresh();
+    } catch {
+      onNotify("เกิดข้อผิดพลาดขึ้นระหว่างการส่งเติมข้อมูลคลังสารเคมีภัย", "error");
     } finally {
       setLoading(false);
     }
@@ -399,8 +497,39 @@ export default function ChemicalStockOS({ dbState, onRefresh, onNotify, userRole
         </div>
       )}
 
-      {/* Main Material Stocks Table (Apple minimal Look) */}
+      {/* Main Material Stocks Table (Spreadsheet Grid View & Inline Editing) */}
       <div className="bg-white rounded-3xl border border-[#E5E5EA] shadow-xs overflow-hidden">
+        <div className="p-5 border-b border-[#E5E5EA] flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-slate-50/50">
+          <div className="space-y-1">
+            <h3 className="font-bold text-sm text-[#1D1D1F] flex items-center gap-2">
+              <span className="bg-indigo-600 text-white px-2 py-0.5 rounded text-[10px] tracking-wider uppercase font-mono font-bold">LIVE-GRID</span>
+              ตารางสารเคมีและวัตถุดิบคลังหลัก (Chemical Stock Board)
+            </h3>
+            <p className="text-[11px] text-[#86868B]">
+              💡 ดับเบิลคลิกหรือคลิกช่องใดก็พิมพ์ได้ เพื่อบันทึกแก้ไขยอดคลังดิบลดเบิกจ่ายเรียลไทม์ (ชื่อ, มวลสารขั้นต่ำ, สต็อกคงตัว, หน่วยวัด)
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={handleAutoReorderPoints}
+              disabled={loading}
+              className="py-1.5 px-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white text-[11px] font-bold rounded-xl shadow-xs flex items-center gap-1.5 transition-all"
+            >
+              <AlertTriangle className="h-3.5 w-3.5 animate-bounce" />
+              ⚡ คำนวณเบิกจัดหาฉุกเฉิน (Auto Stock Reorder)
+            </button>
+            <button
+              type="button"
+              onClick={() => setGridMode(!gridMode)}
+              className="py-1.5 px-3 bg-white text-[#1D1D1F] border border-[#E5E5EA] hover:bg-neutral-50 text-[11px] font-bold rounded-xl transition-all"
+            >
+              {gridMode ? '📋 สลับตารางดั้งเดิม' : '📊 สลับ Spreadsheet Grid Mode'}
+            </button>
+          </div>
+        </div>
+
         <div className="p-5 border-b border-[#E5E5EA] flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div className="flex bg-[#E8E8ED] p-1 rounded-xl text-xs font-semibold">
             <button
@@ -437,15 +566,15 @@ export default function ChemicalStockOS({ dbState, onRefresh, onNotify, userRole
         </div>
 
         <div className="overflow-x-auto text-xs">
-          <table className="w-full text-left border-collapse">
+          <table className={`w-full text-left border-collapse ${gridMode ? 'divide-y divide-slate-150 border-r border-b border-[#E5E5EA]' : ''}`}>
             <thead>
               <tr className="bg-[#F5F5F7] text-[#86868B] font-semibold border-b border-[#E5E5EA]">
-                <th className="p-3.5 pl-5">รหัสวัสดุ</th>
-                <th className="p-3.5">ชื่อสารเคมี / ส่วนผสม / วัตถุดิบดิบ</th>
-                <th className="p-3.5">หมวดหมู่</th>
-                <th className="p-3.5 text-right">เกณฑ์ขั้นต่ำสำรอง (Safety Min)</th>
-                <th className="p-3.5 text-right">ยอดคงเหลือพร้อมใช้</th>
-                <th className="p-3.5 text-center">หน่วยวัด</th>
+                <th className={`p-3.5 pl-5 ${gridMode ? 'border-r border-slate-200' : ''}`}>รหัสวัสดุ</th>
+                <th className={`p-3.5 ${gridMode ? 'border-r border-slate-200' : ''}`}>ชื่อสารเคมี / ส่วนผสม / วัตถุดิบดิบ (คลิกเพื่อแก้ไขสด)</th>
+                <th className={`p-3.5 ${gridMode ? 'border-r border-slate-200' : ''}`}>หมวดหมู่ (แก้ไขทางเมนูรับเข้า)</th>
+                <th className={`p-3.5 text-right ${gridMode ? 'border-r border-slate-200' : ''}`}>เกณฑ์ขั้นต่ำ (Safety Min)</th>
+                <th className={`p-3.5 text-right ${gridMode ? 'border-r border-slate-200' : ''}`}>ยอดคงเหลือพร้อมใช้</th>
+                <th className={`p-3.5 text-center ${gridMode ? 'border-r border-slate-200' : ''}`}>หน่วยวัด</th>
                 <th className="p-3.5 text-center">เสถียรภาพคลัง</th>
               </tr>
             </thead>
@@ -459,15 +588,54 @@ export default function ChemicalStockOS({ dbState, onRefresh, onNotify, userRole
               ) : (
                 materials.map((m: any) => {
                   const isLow = m.stockLevel < m.minStock;
+                  
+                  // Editing active indicators
+                  const isNameEditing = editingCell?.id === m.id && editingCell?.field === 'name';
+                  const isMinStockEditing = editingCell?.id === m.id && editingCell?.field === 'minStock';
+                  const isStockEditing = editingCell?.id === m.id && editingCell?.field === 'stockLevel';
+                  const isUnitEditing = editingCell?.id === m.id && editingCell?.field === 'unit';
+
                   return (
-                    <tr key={m.id} className="hover:bg-[#F5F5F7]/40 transition-colors">
-                      <td className="p-3.5 pl-5 font-mono font-bold text-neutral-800 select-all">
+                    <tr key={m.id} className={`${isLow ? 'bg-amber-50/20' : ''} hover:bg-[#F5F5F7]/45 transition-colors`}>
+                      <td className={`p-3.5 pl-5 font-mono font-bold text-neutral-800 select-all ${gridMode ? 'border-r border-slate-150' : ''}`}>
                         {m.code}
                       </td>
-                      <td className="p-3.5 font-semibold text-slate-800">
-                        {m.name}
-                      </td>
-                      <td className="p-3.5 text-[#515154]">
+
+                      {/* Name Cell */}
+                      {isNameEditing ? (
+                        <td className={`p-1.5 border border-indigo-350 bg-indigo-50/40 ${gridMode ? 'border-r border-slate-150' : ''}`}>
+                          <input
+                            type="text"
+                            value={tempValue}
+                            onChange={(e) => setTempValue(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                handleUpdateCell(m.id, 'name', tempValue);
+                              } else if (e.key === 'Escape') {
+                                setEditingCell(null);
+                              }
+                            }}
+                            onBlur={() => handleUpdateCell(m.id, 'name', tempValue)}
+                            autoFocus
+                            className="bg-white border text-slate-800 border-indigo-300 font-bold p-1 w-full rounded outline-none shadow-xs"
+                          />
+                        </td>
+                      ) : (
+                        <td 
+                          onClick={() => {
+                            setEditingCell({ id: m.id, field: 'name' });
+                            setTempValue(m.name);
+                          }}
+                          className={`p-3.5 font-semibold text-slate-800 cursor-pointer hover:bg-indigo-50/30 hover:text-indigo-900 transition-colors group ${gridMode ? 'border-r border-slate-150' : ''}`}
+                        >
+                          <span className="flex items-center justify-between gap-1">
+                            <span>{m.name}</span>
+                            <span className="text-[10px] text-indigo-400 opacity-0 group-hover:opacity-100 transition-opacity">✏️ แก้ไข</span>
+                          </span>
+                        </td>
+                      )}
+
+                      <td className={`p-3.5 text-[#515154] ${gridMode ? 'border-r border-slate-150' : ''}`}>
                         {m.category === 'Raw Material' ? (
                           <span className="bg-indigo-50 text-indigo-700 border border-indigo-100 px-2 py-0.5 rounded-full text-[10px] font-bold">
                             หัวเชื้อ/สารเจือจางหลัก
@@ -478,17 +646,116 @@ export default function ChemicalStockOS({ dbState, onRefresh, onNotify, userRole
                           </span>
                         )}
                       </td>
-                      <td className="p-3.5 text-right font-mono text-[#86868B]">
-                        {m.minStock.toLocaleString()}
-                      </td>
-                      <td className="p-3.5 text-right font-mono font-bold">
-                        <span className={isLow ? 'text-[#FF9500]' : 'text-[#1D1D1F]'}>
-                          {m.stockLevel.toLocaleString()}
-                        </span>
-                      </td>
-                      <td className="p-3.5 text-center text-[#86868B] font-medium">
-                        {m.unit}
-                      </td>
+
+                      {/* Min Stock Cell */}
+                      {isMinStockEditing ? (
+                        <td className={`p-1.5 border border-indigo-350 bg-indigo-50/40 ${gridMode ? 'border-r border-slate-150' : ''}`}>
+                          <input
+                            type="number"
+                            value={tempValue}
+                            onChange={(e) => setTempValue(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                handleUpdateCell(m.id, 'minStock', tempValue);
+                              } else if (e.key === 'Escape') {
+                                setEditingCell(null);
+                              }
+                            }}
+                            onBlur={() => handleUpdateCell(m.id, 'minStock', tempValue)}
+                            autoFocus
+                            className="bg-white border border-indigo-300 font-mono font-bold p-1 w-full rounded text-right outline-none shadow-xs"
+                          />
+                        </td>
+                      ) : (
+                        <td 
+                          onClick={() => {
+                            setEditingCell({ id: m.id, field: 'minStock' });
+                            setTempValue(String(m.minStock));
+                          }}
+                          className={`p-3.5 text-right font-mono text-[#86868B] cursor-pointer hover:bg-indigo-50/30 hover:text-indigo-900 transition-colors group ${gridMode ? 'border-r border-slate-150' : ''}`}
+                        >
+                          <span className="flex items-center justify-end gap-1">
+                            <span>{m.minStock.toLocaleString()}</span>
+                            <span className="text-[10px] text-indigo-400 opacity-0 group-hover:opacity-100 transition-opacity">✏️</span>
+                          </span>
+                        </td>
+                      )}
+
+                      {/* Stock Level Cell */}
+                      {isStockEditing ? (
+                        <td className={`p-1.5 border border-indigo-350 bg-indigo-50/40 ${gridMode ? 'border-r border-slate-150' : ''}`}>
+                          <input
+                            type="number"
+                            value={tempValue}
+                            onChange={(e) => setTempValue(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                handleUpdateCell(m.id, 'stockLevel', tempValue);
+                              } else if (e.key === 'Escape') {
+                                setEditingCell(null);
+                              }
+                            }}
+                            onBlur={() => handleUpdateCell(m.id, 'stockLevel', tempValue)}
+                            autoFocus
+                            className="bg-white border border-indigo-300 font-mono font-bold p-1 w-full rounded text-right outline-none shadow-xs"
+                          />
+                        </td>
+                      ) : (
+                        <td 
+                          onClick={() => {
+                            setEditingCell({ id: m.id, field: 'stockLevel' });
+                            setTempValue(String(m.stockLevel));
+                          }}
+                          className={`p-3.5 text-right font-mono font-bold cursor-pointer hover:bg-indigo-50/30 hover:text-indigo-950 transition-colors group ${gridMode ? 'border-r border-slate-150' : ''}`}
+                        >
+                          <span className="flex items-center justify-end gap-1">
+                            <span className={isLow ? 'text-[#FF9500] font-extrabold underline' : 'text-[#1D1D1F]'}>
+                              {m.stockLevel.toLocaleString()}
+                            </span>
+                            <span className="text-[10px] text-indigo-400 opacity-0 group-hover:opacity-100 transition-opacity">✏️</span>
+                          </span>
+                        </td>
+                      )}
+
+                      {/* Unit Cell */}
+                      {isUnitEditing ? (
+                        <td className={`p-1.5 border border-indigo-350 bg-indigo-50/40 ${gridMode ? 'border-r border-slate-150' : ''}`}>
+                          <select
+                            value={tempValue}
+                            onChange={(e) => setTempValue(e.target.value)}
+                            onBlur={() => handleUpdateCell(m.id, 'unit', tempValue)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                handleUpdateCell(m.id, 'unit', tempValue);
+                              } else if (e.key === 'Escape') {
+                                setEditingCell(null);
+                              }
+                            }}
+                            autoFocus
+                            className="bg-white border border-indigo-300 font-bold p-1 w-full rounded outline-none shadow-xs"
+                          >
+                            <option value="Kg">Kg</option>
+                            <option value="Liters">Liters</option>
+                            <option value="g">g</option>
+                            <option value="ml">ml</option>
+                            <option value="Pcs">Pcs</option>
+                          </select>
+                        </td>
+                      ) : (
+                        <td 
+                          onClick={() => {
+                            setEditingCell({ id: m.id, field: 'unit' });
+                            setTempValue(m.unit);
+                          }}
+                          className={`p-3.5 text-center text-[#86868B] font-semibold cursor-pointer hover:bg-indigo-50/30 transition-colors group ${gridMode ? 'border-r border-slate-150' : ''}`}
+                        >
+                          <span className="flex items-center justify-center gap-1">
+                            <span>{m.unit}</span>
+                            <span className="text-[9px] text-[#86868B] opacity-0 group-hover:opacity-100 transition-opacity">✏️</span>
+                          </span>
+                        </td>
+                      )}
+
                       <td className="p-3.5 text-center">
                         {isLow ? (
                           <span className="inline-flex items-center gap-1 text-[#FF9500] font-semibold text-[11px] bg-[#FF9500]/10 px-2 py-0.5 rounded-lg">

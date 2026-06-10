@@ -494,47 +494,158 @@ export default function PerfumeFormulaOS({ dbState, onRefresh, onNotify, userRol
                 </div>
               </div>
 
-              {/* BATCH INGREDIENTS SCALE RESULTS LIST (รองรับการแสดงผลอัตราส่วนสเกลจริง) */}
-              <div className="space-y-3">
+              {/* BATCH INGREDIENTS SCALE RESULTS LIST (ระบบแสดงผลรายการส่วนผสมที่ต้องเบิกจ่ายจากคลัง พร้อมยอดรวมสะสม) */}
+              <div className="space-y-4">
                 <div className="flex justify-between items-center text-xs text-slate-500 font-semibold border-b border-[#E5E5EA] pb-1.5">
-                  <span>รายการสารเคมีที่ต้องนำมาชั่งป้อนถังตุน</span>
-                  <span className="font-mono text-[11px] text-slate-600 font-bold">เป้าหมายรวม: {batchWeight.toLocaleString()} {batchUnit === 'kg' ? 'กิโลกรัม' : 'ลิตร'}</span>
+                  <span className="flex items-center gap-1 font-bold text-slate-800">
+                    <Package className="h-4 w-4 text-pink-600" />
+                    รายการมวลสารและจำนวนที่ต้องเบิกจ่ายเด็ดขาดจากคลัง (ChemicalStockOS)
+                  </span>
+                  <span className="font-mono text-[11px] text-slate-650 font-bold">เป้าหมายป้อน: {batchWeight.toLocaleString()} {batchUnit === 'kg' ? 'กิโลกรัม' : 'ลิตร'}</span>
                 </div>
 
-                <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+                <div className="space-y-2.5 max-h-80 overflow-y-auto pr-1">
                   {activeFormula.items && activeFormula.items.map((item: any, idx: number) => {
-                    const materialName = getMaterialName(item.materialId);
-                    const materialCode = getMaterialCode(item.materialId);
+                    const materialRaw = (dbState.materials || []).find((x: any) => x.id === item.materialId);
+                    const materialName = materialRaw ? materialRaw.name : item.materialId;
+                    const materialCode = materialRaw ? materialRaw.code : item.materialId;
+                    const stockLevel = materialRaw ? materialRaw.stockLevel : 0;
+                    const unit = materialRaw ? materialRaw.unit : (batchUnit === 'kg' ? 'Kg' : 'L');
                     
                     // Ratio proportion
                     const proportionRatio = item.quantity;
                     
-                    // Calculated weight
+                    // Calculated weight to deduct
                     const calculatedScaledValue = (batchWeight * proportionRatio);
+                    const hasEnoughStock = stockLevel >= calculatedScaledValue;
 
                     return (
-                      <div key={idx} className="flex items-center justify-between border-b border-[#E5E5EA] py-3 text-xs last:border-0 hover:bg-[#F5F5F7]/30 px-2 rounded-lg transition-colors">
+                      <div key={idx} className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-[#E5E5EA] py-3 text-xs last:border-0 hover:bg-[#F5F5F7]/30 px-3 rounded-xl transition-colors gap-2">
                         <div className="space-y-1">
-                          <div className="flex items-center gap-1.5">
-                            <span className="font-mono text-[9px] bg-neutral-100 text-neutral-800 px-1.5 py-0.5 rounded border border-[#E5E5EA] font-semibold">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-mono text-[9px] bg-neutral-900 text-white px-2 py-0.5 rounded-md font-bold">
                               {materialCode}
                             </span>
                             <span className="font-bold text-slate-800">{materialName}</span>
+                            
+                            <span className={`px-2 py-0.5 rounded-full text-[9px] font-semibold ${
+                              hasEnoughStock 
+                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' 
+                                : 'bg-rose-50 text-rose-700 border border-rose-150 animate-pulse'
+                            }`}>
+                              {hasEnoughStock ? '✅ ยอดคลังพร้อมเบิก' : '❌ มีสต็อกไม่เพียงพอ'}
+                            </span>
                           </div>
-                          <span className="text-[10px] text-slate-400 font-semibold font-mono">
-                            สัดส่วนสูตรแม่เหล็ก: {(proportionRatio * 100).toFixed(2)}% ของปริมาตรผสม
-                          </span>
+                          
+                          <div className="flex items-center gap-2 text-[10px] text-slate-400 font-semibold font-mono">
+                            <span>สัดส่วนในสูตร: {(proportionRatio * 100).toFixed(2)}%</span>
+                            <span>•</span>
+                            <span>คงเหลือในคลังจริง: <strong className="text-slate-600 underline">{stockLevel.toLocaleString()} {unit}</strong></span>
+                          </div>
                         </div>
 
                         <div className="text-right space-y-0.5">
-                          <span className="font-mono text-sm font-bold text-indigo-600 block bg-indigo-50/50 px-3.5 py-1 rounded-xl border border-indigo-100">
-                            {calculatedScaledValue.toFixed(4)} <span className="font-sans text-[10px] font-bold text-indigo-500">{batchUnit === 'kg' ? 'Kg' : 'Liters'}</span>
+                          <span className="font-mono text-xs font-bold text-[#1D1D1F] block">จำนวนสเกลเบิก:</span>
+                          <span className={`font-mono text-sm font-extrabold block px-3 py-1 rounded-xl border ${
+                            hasEnoughStock 
+                              ? 'bg-indigo-50/50 text-indigo-700 border-indigo-100' 
+                              : 'bg-rose-50/50 text-rose-700 border-rose-100'
+                          }`}>
+                            {calculatedScaledValue.toFixed(4)} <span className="font-sans text-[10px] font-bold">{unit}</span>
                           </span>
                         </div>
                       </div>
                     );
                   })}
                 </div>
+
+                {/* Calculate precise grand total across ingredients */}
+                {(() => {
+                  const items = activeFormula.items || [];
+                  const totalProportion = items.reduce((sum: number, x: any) => sum + (Number(x.quantity) || 0), 0);
+                  const totalWeightCalculated = batchWeight * totalProportion;
+                  
+                  // Check if any ingredient is short in supply
+                  const isAnyShort = items.some((item: any) => {
+                    const m = (dbState.materials || []).find((x: any) => x.id === item.materialId);
+                    const calculated = batchWeight * item.quantity;
+                    return m ? m.stockLevel < calculated : true;
+                  });
+
+                  return (
+                    <div className="space-y-4 pt-3 border-t border-[#E5E5EA]">
+                      {/* Precise Cumulative Compounding Summary Grid */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-neutral-50 p-4 rounded-2xl border border-[#E5E5EA]">
+                        <div className="text-xs">
+                          <p className="text-[#86868B] font-bold text-[10px] uppercase tracking-wider">สัดส่วนสูตรโครงสร้างหัวนํ้าหอม</p>
+                          <p className="font-bold text-slate-800 text-sm font-mono mt-0.5">{(totalProportion * 100).toFixed(2)}%</p>
+                        </div>
+                        <div className="text-xs sm:text-right">
+                          <p className="text-pink-600 font-bold text-[10px] uppercase tracking-wider">ยอดรวมสุทธิกระสุนสารสกัด (compounding grand total)</p>
+                          <p className="font-extrabold text-pink-700 text-base font-mono mt-0.5">
+                            {totalWeightCalculated.toFixed(4)} <span className="font-sans text-xs">{batchUnit === 'kg' ? 'Kg' : 'Liters'}</span>
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Interactive Compounding Button Action */}
+                      <div className="flex flex-col sm:flex-row gap-3 pt-1">
+                        <button
+                          type="button"
+                          disabled={loading}
+                          onClick={async () => {
+                            if (isAnyShort) {
+                              const confirmShort = window.confirm("⚠️ แจ้งเตือน: มีสารดิบในคลังต่ำกว่ายอดสเกลน้ำหนักผสมสูตรที่ต้องเบิกจ่ายจริง ท่านต้องการทำงานเบิกแบบกักพิกัด (Force Overdraft) หรือไม่?");
+                              if (!confirmShort) return;
+                            } else {
+                              const confirmIssue = window.confirm(`ท่านต้องการดำเนินรายการบันทึก 'เบิกจ่ายวัตถุดิบและตัดยอดสารเคมีตามสูตร' จำนวนรวมสเกล ${totalWeightCalculated.toFixed(4)} ${batchUnit} ออกจากคลัง ChemicalStockOS ไปยังแล็บผสมทันทีใช่หรือไม่?`);
+                              if (!confirmIssue) return;
+                            }
+
+                            setLoading(true);
+                            try {
+                              let processedCount = 0;
+                              // Loop through all items and update material levels via API
+                              for (const item of activeFormula.items) {
+                                const m = (dbState.materials || []).find((x: any) => x.id === item.materialId);
+                                if (m) {
+                                  const needed = batchWeight * item.quantity;
+                                  const updatedMaterial = {
+                                    ...m,
+                                    stockLevel: Math.max(0, Number((m.stockLevel - needed).toFixed(4)))
+                                  };
+
+                                  await fetch('/api/generic/update', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ table: 'materials', item: updatedMaterial })
+                                  });
+                                  processedCount++;
+                                }
+                              }
+
+                              // Write a GMP transaction or log event
+                              onNotify(`✓ ทำบันทึกตัดยอดสต็อกและเบิกจ่ายสำเร็จเรียบร้อย ${processedCount} รายการสารเคมี! ยอดสต็อกได้รับการอัปเดตแบบเรียลไทม์ในระบบ ChemicalStockOS`, "info");
+                              onRefresh();
+                            } catch (err) {
+                              onNotify("ไม่สามารถทำรายการเบิกหักลบจำนวนในคลังดิบ กรุณาตรวจสอบอินเทอร์เน็ต", "error");
+                            } finally {
+                              setLoading(false);
+                            }
+                          }}
+                          className={`w-full py-3 px-4.5 rounded-xl font-bold text-xs transition-all shadow-md flex items-center justify-center gap-2 ${
+                            isAnyShort 
+                              ? 'bg-[#FF9500] hover:bg-[#e08400] text-white' 
+                              : 'bg-indigo-650 hover:bg-indigo-700 text-white'
+                          }`}
+                        >
+                          <Scale className="h-4 w-4 animate-spin-slow" />
+                          {isAnyShort ? 'สัญญารับเบิกจ่ายจำลองฉุกเฉิน (Overdraft Compound)' : '⚡ กดบันทึกเพื่อหักลดสต็อกคลังเบิกจ่ายจริงทันที (Auto-Issue Compounding)'}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Informational Summary Alert */}
